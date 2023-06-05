@@ -1,0 +1,6 @@
+/1-src/analysis/**/*-output/
+/1-src/analysis/**/*-output/*
+/1-src/analysis/**/*.html
+/2-markdown/*
+!/2-markdown/*.Rmd
+!/2-markdown/*.R

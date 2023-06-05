@@ -1,0 +1,1 @@
+Scripts given in 1-src/analysis/ assume preprocessed methylation data (beta-matrices) are stored here.

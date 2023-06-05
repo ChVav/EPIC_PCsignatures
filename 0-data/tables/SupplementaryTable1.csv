@@ -1,0 +1,6 @@
+﻿Data set ID,Array type,Nr unique samples,Sample replication,Tissue,Purpose,Raw data repository,Access IDs
+repeatability,EPIC v1.0,12,4x,"cervical smears, whole blood",Test-retest technical replication,EGA,EGAS00001007184
+3CDisc,EPIC v1.0,1657,1x,cervical smears,Prediction age and female cancers,EGA,"EGAS00001005055, EGAS00001005045,  EGAS00001005033"
+3CExtVal,EPIC v1.0,449,1x,cervical smears,Validation age and female cancer predictors,EGA,"EGAS00001005055, EGAS00001005045,  EGAS00001005033"
+Hannum ,450K,656,1x,whole blood,Design Hannum clock,GEO,GSE40279
+BloodRep_450K,450K,36,2x,whole blood,Validation Hannum clock,GEO,GSE55763

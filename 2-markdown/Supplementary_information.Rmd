@@ -1,0 +1,151 @@
+---
+title: "Devising reliable and accurate epigenetic clocks: choosing the optimal computational solution"
+author: "Supplementary Information"
+date: ""
+output:
+  pdf_document:
+    toc: false
+    latex_engine: xelatex
+header-includes:
+  \usepackage{fontspec}
+  \usepackage[utf8]{inputenc}
+  \usepackage{pdfpages}
+  \usepackage{graphicx}
+  \setmainfont{Arial}
+---
+
+```{r, echo=FALSE, message = FALSE, warning = FALSE}
+library(knitr)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(tidyverse)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning = FALSE)
+
+theme_set(theme_minimal())
+
+```
+
+
+Charlotte D. Vavourakis, Chiara M. Herzog, Martin Widschwendter
+
+\tableofcontents
+
+\pagebreak
+
+# Extended Methods
+
+xxxx
+
+\pagebreak
+
+# Supplementary Tables
+
+\subsection{Table S1. Datasets used in this study.}
+
+```{r}
+
+dat <- read.table(file= "../0-data/tables/SupplementaryTable1.csv",
+                  sep = ",",
+                  header=T) %>%
+  dplyr::rename(Data.ID=Data.set.ID, #shorten colnames
+                Type = Array.type,
+                Unique.samples = Nr.unique.samples,
+                Reps = Sample.replication,
+                Repo = Raw.data.repository) %>%
+  select(-Purpose)
+
+colnames(dat) <- gsub("[.]"," ",colnames(dat))
+
+dat %>%
+  kbl("latex",booktabs=T, align = c("l",rep("c",5),"l")) %>%
+  row_spec(0,bold=T) %>%
+  column_spec(2:3, width= "1.5cm") %>%
+  column_spec(4, width = "1cm") %>%
+  column_spec(5, width = "2.5cm") %>%
+  column_spec(6, width = "1cm") %>%
+  column_spec(7, width = "2cm") 
+
+```
+
+\pagebreak
+
+# Supplementary Figures
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE, fig.width=10, fig.height=5}
+
+comparison <- readRDS("../1-src/analysis/1-Hannum-clocks-Higgins/2-output/pheno_BloodRep_450K_Hannum_PC.Rds")
+
+# a) original Hannum clock
+fit <- lm(round(Hannum.EUTOPS, digits=4) ~ round(Hannum.higgins, digits=4), data = comparison)
+anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
+                 "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+
+a <- comparison %>%
+  ggplot(aes(x = round(Hannum.higgins, digits=4), y = round(Hannum.EUTOPS, digits=4))) +
+  geom_point() +
+  theme(panel.background = element_blank(),aspect.ratio = 1) +
+  geom_smooth(method = "lm",
+                formula = y ~ x,
+                size = 0.5,
+                se = FALSE,
+                alpha = 0.3,
+                colour = "gray40") +
+  xlab("Hannum age (higgins)") +
+  ylab("Hannum age (EUTOPS)")  +
+  xlim(35,85) +
+  ylim(35,85) +
+  annotate("text",
+            x=40,
+            y = 80,
+            label = anno,
+            hjust = 0,
+            linewidth = 3)
+
+# b) Hannum PC proxy
+
+fit <- lm(round(Hannum_PCproxy.EUTOPS, digits=4) ~ round(Hannum_PCproxy.higgins, digits=4), data = comparison)
+anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
+                 "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+
+b <- comparison %>%
+  ggplot(aes(x = round(Hannum_PCproxy.higgins, digits=4), y = round(Hannum_PCproxy.EUTOPS, digits=4))) +
+  geom_point() +
+  theme(panel.background = element_blank(),aspect.ratio = 1) +
+  geom_smooth(method = "lm",
+                formula = y ~ x,
+                size = 0.5,
+                se = FALSE,
+                alpha = 0.3,
+                colour = "gray40") +
+  xlab("Hannum_PCproxy age (higgins)") +
+  ylab("Hannum_PCproxy age (EUTOPS)")  +
+  xlim(35,85) +
+  ylim(35,85) +
+  annotate("text",
+            x=40,
+            y = 80,
+            label = anno,
+            hjust = 0,
+            linewidth = 3)
+
+plot <- a+b
+
+plot
+
+```
+
+\subsection{Figure S1. Reproducing clock calculations presented by Higgins-Chen et al, *Nature Aging* 2022 ADD REF.} Regression of age predictions for the same clock versions calculated ourselves (Y-axis) versus by ADDREF (X-axis). Age estimations were done for samples in the "BloodRep_450K" dataset (GEO ID GSE55763) with the *a.* Hannum original clock and *b.* by Hannum PC proxy clock. <br>
+
+\pagebreak
+
+\includegraphics[]{./figure_supplement/FigureS2.png}
+
+\subsection{Figure S2. Effect of PCA transformation (feature extraction) on the performance of cancer predition models.} 
+\textbf{(a)} "multi-3C-autogluon" is a version of the classifier trained on 17,837 selected features from the original feature space (beta-methylation values of CpGs).
+\textbf{(b)} "multi-3C-autogluon\_PC" is a version of the classifier trained on 1646 principal components derived from the beta-methylation values, as well as (chronological) age of a sample's subject and predicted immune cell composition of a sample.
+Multi-class classifiers were trained on the "3CDisc" with the automated machine learning framework AutoGluon and accuracy was evaluated on the "3CExtVal" data sets comparing each class versus the rest of the classes. Top panels give the distribution of the predicted probabilities for controls (cancer free women), breast, ovarian or endometrial cancer cases. Bottom panels give the corresponding receiver operator curves (ROCs).
+
+
