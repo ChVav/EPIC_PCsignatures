@@ -1,0 +1,93 @@
+---
+output:
+  pdf_document:
+    toc: false
+    latex_engine: xelatex
+header-includes:
+  \usepackage{fontspec}
+  \usepackage[utf8]{inputenc}
+  \usepackage{pdfpages}
+  \usepackage{graphicx}
+  \setmainfont{Arial}
+  \thispagestyle{empty}
+---
+
+```{r, echo=FALSE, message = FALSE, warning = FALSE}
+library(knitr)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(tidyverse)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning = FALSE)
+
+theme_set(theme_minimal())
+
+```
+
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE, fig.width=10, fig.height=5}
+
+comparison <- readRDS("../1-src/analysis/1-Hannum-clocks-Higgins/2-output/pheno_BloodRep_450K_Hannum_PC.Rds")
+
+# a) original Hannum clock
+fit <- lm(round(Hannum.EUTOPS, digits=4) ~ round(Hannum.higgins, digits=4), data = comparison)
+anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
+                 "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+
+a <- comparison %>%
+  ggplot(aes(x = round(Hannum.higgins, digits=4), y = round(Hannum.EUTOPS, digits=4))) +
+  geom_point() +
+  theme(panel.background = element_blank(),aspect.ratio = 1) +
+  geom_smooth(method = "lm",
+                formula = y ~ x,
+                size = 0.5,
+                se = FALSE,
+                alpha = 0.3,
+                colour = "gray40") +
+  xlab("Hannum age (higgins)") +
+  ylab("Hannum age (EUTOPS)")  +
+  xlim(35,85) +
+  ylim(35,85) +
+  annotate("text",
+            x=40,
+            y = 80,
+            label = anno,
+            hjust = 0,
+            linewidth = 3)
+
+# b) Hannum PC proxy
+
+fit <- lm(round(Hannum_PCproxy.EUTOPS, digits=4) ~ round(Hannum_PCproxy.higgins, digits=4), data = comparison)
+anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
+                 "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+
+b <- comparison %>%
+  ggplot(aes(x = round(Hannum_PCproxy.higgins, digits=4), y = round(Hannum_PCproxy.EUTOPS, digits=4))) +
+  geom_point() +
+  theme(panel.background = element_blank(),aspect.ratio = 1) +
+  geom_smooth(method = "lm",
+                formula = y ~ x,
+                size = 0.5,
+                se = FALSE,
+                alpha = 0.3,
+                colour = "gray40") +
+  xlab("Hannum_PCproxy age (higgins)") +
+  ylab("Hannum_PCproxy age (EUTOPS)")  +
+  xlim(35,85) +
+  ylim(35,85) +
+  annotate("text",
+            x=40,
+            y = 80,
+            label = anno,
+            hjust = 0,
+            linewidth = 3)
+
+plot <- a+b
+
+plot
+
+```
+
+\subsection{Extended data item 2. Reproducing clock calculations presented by [1].} Regression of age predictions for the same clock versions calculated ourselves (Y-axis) versus by [1] (X-axis). Age estimations were done for samples in the "BloodRep_450K" dataset (GEO ID GSE55763) with the *a.* Hannum original clock and *b.* by Hannum PC proxy clock. <br>

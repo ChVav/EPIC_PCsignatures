@@ -1,0 +1,58 @@
+---
+output:
+  pdf_document:
+    toc: false
+    latex_engine: xelatex
+header-includes:
+  \usepackage{fontspec}
+  \usepackage[utf8]{inputenc}
+  \usepackage{pdfpages}
+  \usepackage{graphicx}
+  \setmainfont{Arial}
+  \thispagestyle{empty}
+---
+
+```{r, echo=FALSE, message = FALSE, warning = FALSE}
+library(knitr)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(tidyverse)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning = FALSE)
+
+theme_set(theme_minimal())
+
+```
+
+
+\subsection{Extended data item 1. Data sets analyzed in this study.} Unique sample numbers reflect for each (composite) data set the final numbers in the subset carried forward for the analysis.
+
+```{r}
+
+dat <- read.table(file= "../0-data/tables/SupplementaryTable1.csv",
+                  sep = ",",
+                  header=T) %>%
+  dplyr::rename(Data.ID=Data.set.ID, #shorten colnames
+                Type = Array.type,
+                Unique.samples = Nr.unique.samples,
+                Reps = Sample.replication,
+                Repo = Raw.data.repository) %>%
+  select(-Purpose)
+
+colnames(dat) <- gsub("[.]"," ",colnames(dat))
+
+dat %>%
+  kbl("latex",booktabs=T, align = c("l",rep("c",5),"l")) %>%
+  row_spec(0,bold=T) %>%
+  column_spec(2, width= "2cm") %>%
+  column_spec(3, width= "1.5cm") %>%
+  column_spec(4, width = "1cm") %>%
+  column_spec(5, width = "2cm") %>%
+  column_spec(6, width = "1cm") %>%
+  column_spec(7, width = "2cm") 
+
+
+```
+
