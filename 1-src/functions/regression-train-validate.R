@@ -3,7 +3,7 @@
 # Train Lasso regression + predict age in validation sets + calculate precision/accuracy
 
 regressionTrainvalidate <- function(beta_tr,pheno_tr,beta_val,pheno_val,beta_rep,pheno_rep,alpha) {
-  require(dplyr)
+  
   require(tidyverse)
   require(glmnet)
   require(irr)

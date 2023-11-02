@@ -1,0 +1,369 @@
+---
+title: "Modeling Accuracy (slope or MSE) and Precision for combined experiments on blood samples"
+output:
+  html_document:
+    code_folding: hide
+    toc: false
+    number_sections: false
+---
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE}
+
+##### Copyright (c) 2023 Charlotte D. Vavourakis. Licensed under the MIT license (see LICENSE.md).
+
+library(knitr)
+library(tidyverse)
+library(patchwork)
+library(kableExtra)
+
+knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(echo=FALSE)
+
+theme_set(theme_minimal())
+
+dir.create("./8-output")
+```
+
+```{r, echo=FALSE, message=FALSE, echo=FALSE}
+
+## combine results and save
+experiment1 <- readRDS("./5-output/results_training_size.Rds")
+experiment2 <- readRDS("./6-output/results_training_size.Rds")
+#experiment3 <- readRDS("./7-output/results_training_size.Rds")
+
+results_exp <- full_join(experiment1,experiment2) %>% drop_na()
+#results_exp <- full_join(results_exp,experiment3) %>% drop_na()
+
+saveRDS(results_exp, file="./8-output/results_trainingsize_combined.Rds")
+
+```
+
+## Methods
+
+Check performance clocks trained on original vs PCA-derived feature space with increasing training set size: <br>
+
+* Elastic net penalized regression, 10K cross-validation 
+* Training set: Framingham Heart study (450K), 2639 peripheral blood samples, age range: 23.7-75 (GSE55763; missing values imputed)
+* External validation accuracy: Hannum subset same age range (450K), 479 blood samples (GSE40279)
+* Validation repeatability: technical reps from FHS, 2x36 blood samples (missing values imputed)
+* Randomly subsetting training set, three levels of granularity: <br>
+     - fine: n min = 34, n max = 54, n step = 5 
+     - medium: n min = 59, n max = 1619, n step = 20 
+     - coarse: n min = 1639, n max = 2639, n step = 100 
+* Experiment repeated 3x, total of 3x95 sample sizes/clocks checked
+
+## Model accuracy
+
+### slope regression
+
+* modeled curves: <br>
+     Y =  Ymax - aX^k ; <br>
+     X =  number of training samples <br>
+     Y = slope regression (age~predicted age in Hannum external validation), Ymax is the maximum slope the model converges to <br>
+     a,k = parameters determining curve shape <br>
+
+```{r, message=FALSE, echo=FALSE, fig.width=6, fig.height=4}
+
+# function
+powerLaw1 <- function(x,a,b,c){
+    c-(a*(x^b))
+}
+
+#### Elastic net trained in original feature-space
+# find starting parameters for model fits
+ymax <- results_exp[results_exp$method == 'ElNet',] %>% pull(val.slope.regress) %>% max()
+fit <- lm(log(val.slope.regress)~log(train.sample.size), data=results_exp[results_exp$method == 'ElNet',])
+as <- unname(fit$coefficients[2]) #slope
+bs <- unname(fit$coefficients[1]) #intercept
+# check plot(fit)
+
+#fiddled around with parameters to see effect on curve
+# test <- unique(results_exp$train.sample.size)
+# testy <- 0.91 - 0.12*(test**-0.98)  
+# df <- data.frame(x=test,y=testy)
+# #plot(df)
+# check <- results_exp[results_exp$method == 'ElNet',] %>%
+#   ggplot(aes(x=train.sample.size,y=val.slope.regress)) +
+#   geom_point() +
+#   geom_function(fun = powerLaw1, args = list(a = 20, b = bs, c = ymax))
+
+# fit and check fit
+modelf1 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'ElNet',], start = list(a=20, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+
+plota <- results_exp[results_exp$method == 'ElNet',] %>%
+  ggplot(aes(x=train.sample.size,y=val.slope.regress)) +
+  geom_point() +
+  geom_function(fun = powerLaw1, args = list(a = coef(modelf1)[1], b = coef(modelf1)[2], c = coef(modelf1)[3]))
+
+# save results
+f1.fitted.values <- results_exp[results_exp$method == 'ElNet',] %>% mutate(val.slope.regress.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
+
+doublecheck <- f1.fitted.values %>%
+  ggplot(aes(x=train.sample.size)) +
+  geom_point(aes(y=val.slope.regress)) +
+  geom_line(aes(y=val.slope.regress.fit))
+
+#### Elastic net trained on PCA-derived features
+# try same start parameters first
+modelf2 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'PC',], start = list(a=20, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+
+plotb <- results_exp[results_exp$method == 'PC',] %>%
+  ggplot(aes(x=train.sample.size,y=val.slope.regress)) +
+  geom_point() +
+  geom_function(fun = powerLaw1, args = list(a = coef(modelf2)[1], b = coef(modelf2)[2], c = coef(modelf2)[3]))
+
+# save results
+f2.fitted.values <- results_exp[results_exp$method == 'PC',] %>% mutate(val.slope.regress.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
+
+doublecheck <- f2.fitted.values %>%
+  ggplot(aes(x=train.sample.size)) +
+  geom_point(aes(y=val.slope.regress)) +
+  geom_line(aes(y=val.slope.regress.fit))
+
+results_exp_accuracy <- full_join(f1.fitted.values,f2.fitted.values)
+
+saveRDS(results_exp_accuracy, file = "./8-output/accuracy_slope.Rds")
+
+#### plot all results and modeled curves
+plot <- results_exp_accuracy %>%
+  ggplot(aes(x=train.sample.size,color=method)) +
+  geom_point(aes(y=val.slope.regress), size=0.5) +
+  geom_line(aes(y=val.slope.regress.fit), linewidth=1.2) 
+
+plot
+
+#### save model paramaters
+df <- data.frame(modelf=rep(NA,2), 
+                 method=rep(NA,2),
+                 sample.type=rep(NA,2),
+                 slope.a = rep(NA,2), slope.k = rep(NA,2), max.slope = rep(NA,2), 
+                 SE.slope.a = rep(NA,2), SE.slope.k = rep(NA,2), SE.max.slope = rep(NA,2),
+                 RSE= rep(NA,2), DF = rep(NA,2))
+df[1,] <- c("f1","ElNet.clocks","blood",coef(modelf1),unname(summary(modelf1)$parameters[,2]), summary(modelf1)$sigma, summary(modelf1)$df[2])
+df[2,] <- c("f2","PC.ElNet.clocks","blood",coef(modelf2),unname(summary(modelf2)$parameters[,2]), summary(modelf2)$sigma, summary(modelf2)$df[2])
+
+df <- df %>% select(method,sample.type,slope.a,SE.slope.a,slope.k,SE.slope.k,max.slope,SE.max.slope,RSE,DF)
+df$slope.a <- round(as.numeric(df$slope.a), digits=1)
+df$SE.slope.a <- round(as.numeric(df$SE.slope.a), digits=1)
+df$slope.k <- round(as.numeric(df$slope.k), digits=2)
+df$SE.slope.k <- round(as.numeric(df$SE.slope.k), digits=2)
+df$max.slope <- round(as.numeric(df$max.slope), digits=3)
+df$SE.max.slope <- round(as.numeric(df$SE.slope.k), digits=3)
+df$RSE <- round(as.numeric(df$RSE), digits=2)
+
+saveRDS(df, file="./8-output/accuracy_slope_modelpar.Rds")
+
+```
+
+```{r}
+df %>% kbl() %>% kable_styling()
+```
+
+<br>
+
+### MSE regression
+
+* Modeled curves: <br>
+     Y =  Ymin - aX^k ; <br>
+     X =  number of training samples <br>
+     Y = MSE regression (age~predicted age in Hannum external validation), Ymin is the minimum MSE the model converges to <br>
+     a,k = parameters determining curve shape <br>
+
+```{r, message=FALSE, echo=FALSE, fig.width=6, fig.height=4}
+
+#### Elastic net trained in original feature-space
+# find starting parameters for model fits
+ymin <- results_exp[results_exp$method == 'ElNet',] %>% pull(val.MSE) %>% min()
+fit <- lm(log(val.MSE)~log(train.sample.size), data=results_exp[results_exp$method == 'ElNet',])
+as <- unname(fit$coefficients[2]) #slope
+bs <- unname(fit$coefficients[1]) #intercept
+# check plot(fit)
+
+# test <- unique(results_exp$train.sample.size)
+# testy1 <- ymin - (as*(test**-bs))
+# testy2 <- powerLaw1(x=test,a=as,b=-bs,c=ymin)
+# df1 <- data.frame(x=test,y=testy2, check="original")
+# testy2 <- powerLaw1(x=test,a=-10000,b=-1,c=ymin)
+# df2 <- data.frame(x=test,y=testy2, check="fiddling")
+# df <- full_join(df1,df2)
+# check <- df %>% ggplot(aes(x=x,y=y,color=check)) + geom_point()
+# check <- results_exp[results_exp$method == 'ElNet',] %>%
+#   ggplot(aes(x=train.sample.size,y=val.MSE)) +
+#   geom_point() +
+#   geom_function(fun = powerLaw1, args = list(a = -10000, b = -1, c = ymin))
+
+# fit and check fit
+modelf1 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'ElNet',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
+
+plota <- results_exp[results_exp$method == 'ElNet',] %>%
+  ggplot(aes(x=train.sample.size,y=val.MSE)) +
+  geom_point() +
+  geom_function(fun = powerLaw1, args = list(a = coef(modelf1)[1], b = coef(modelf1)[2], c = coef(modelf1)[3]))
+
+# save results
+f1.fitted.values <- results_exp[results_exp$method == 'ElNet',] %>% mutate(val.MSE.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
+
+doublecheck <- f1.fitted.values %>%
+  ggplot(aes(x=train.sample.size)) +
+  geom_point(aes(y=val.MSE)) +
+  geom_line(aes(y=val.MSE.fit))
+
+#### Elastic net trained on PCA-derived features
+# try same start parameters first
+modelf2 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'PC',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
+
+plotc <- results_exp[results_exp$method == 'PC',] %>%
+  ggplot(aes(x=train.sample.size,y=val.MSE)) +
+  geom_point() +
+  geom_function(fun = powerLaw1, args = list(a = coef(modelf2)[1], b = coef(modelf2)[2], c = coef(modelf2)[3]))
+
+# save results
+f2.fitted.values <- results_exp[results_exp$method == 'PC',] %>% mutate(val.MSE.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
+
+doublecheck <- f2.fitted.values %>%
+  ggplot(aes(x=train.sample.size)) +
+  geom_point(aes(y=val.MSE)) +
+  geom_line(aes(y=val.MSE.fit))
+
+results_exp_accuracy2 <- full_join(f1.fitted.values,f2.fitted.values)
+
+saveRDS(results_exp_accuracy2, file = "./8-output/accuracy_MSE.Rds")
+
+#### plot all results and modeled curves
+plot <- results_exp_accuracy2 %>%
+  ggplot(aes(x=train.sample.size,color=method)) +
+  geom_point(aes(y=val.MSE), size=0.5) +
+  geom_line(aes(y=val.MSE.fit), linewidth=1.2) 
+
+plot
+
+```
+
+<br><br>
+
+## Model precision
+
+* modeled curves: <br>
+     Y =  Ymax - aX^k ; <br>
+     X =  number of training samples <br>
+     Y = ICC in cervical smears repeatability set, Ymax is the maximum ICC the model converges to <br>
+     a,k = parameters determining curve shape <br>
+
+```{r, message=FALSE, echo=FALSE, fig.width=6, fig.height=4}
+
+#### Elastic net trained in original feature-space
+# find starting parameters for model fits
+ymax <- results_exp[results_exp$method == 'ElNet',] %>% pull(rep.ICC) %>% max()
+fit <- lm(log(rep.ICC)~log(train.sample.size), data=results_exp[results_exp$method == 'ElNet',])
+as <- unname(fit$coefficients[2]) #slope
+bs <- unname(fit$coefficients[1]) #intercept
+
+# test <- unique(results_exp$train.sample.size)
+# testy <- ymax - as*(test**bs)
+# df <- data.frame(x=test,y=testy)
+# #plot(df)
+# check <- results_exp[results_exp$method == 'ElNet',] %>%
+#   ggplot(aes(x=train.sample.size,y=rep.ICC)) +
+#   geom_point() +
+#   geom_function(fun = powerLaw1, args = list(a = 0.05, b = bs, c = ymax))
+
+# fit and check fit
+modelf1 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'ElNet',], start = list(a=0.05, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+
+plota <- results_exp[results_exp$method == 'ElNet',] %>%
+  ggplot(aes(x=train.sample.size,y=rep.ICC)) +
+  geom_point() +
+  geom_function(fun = powerLaw1, args = list(a = coef(modelf1)[1], b = coef(modelf1)[2], c = coef(modelf1)[3]))
+
+# save results
+f1.fitted.values <- results_exp[results_exp$method == 'ElNet',] %>% mutate(rep.ICC.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
+
+doublecheck <- f1.fitted.values %>%
+  ggplot(aes(x=train.sample.size)) +
+  geom_point(aes(y=rep.ICC)) +
+  geom_line(aes(y=rep.ICC.fit))
+
+#### Elastic net trained on PCA-derived features
+# find starting parameters for model fits
+ymax <- results_exp[results_exp$method == 'PC',] %>% pull(rep.ICC) %>% max()
+fit <- lm(log(rep.ICC)~log(train.sample.size), data=results_exp[results_exp$method == 'PC',])
+as <- unname(fit$coefficients[2]) #slope
+bs <- unname(fit$coefficients[1]) #intercept
+
+# test <- unique(results_exp$train.sample.size)
+# testy <- ymax - as*(test**bs)
+# df <- data.frame(x=test,y=testy)
+# #plot(df)
+# check <- results_exp[results_exp$method == 'PC',] %>%
+#   ggplot(aes(x=train.sample.size,y=rep.ICC)) +
+#   geom_point() +
+#   geom_function(fun = powerLaw1, args = list(a = 0.15, b = bs, c = ymax))
+
+modelf2 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'PC',], start = list(a=0.15, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+
+plotb <- results_exp[results_exp$method == 'PC',] %>%
+  ggplot(aes(x=train.sample.size,y=rep.ICC)) +
+  geom_point() +
+  geom_function(fun = powerLaw1, args = list(a = coef(modelf2)[1], b = coef(modelf2)[2], c = coef(modelf2)[3]))
+
+# save results
+f2.fitted.values <- results_exp[results_exp$method == 'PC',] %>% mutate(rep.ICC.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
+
+doublecheck <- f2.fitted.values %>%
+  ggplot(aes(x=train.sample.size)) +
+  geom_point(aes(y=rep.ICC)) +
+  geom_line(aes(y=rep.ICC.fit))
+
+results_exp_precision <- full_join(f1.fitted.values,f2.fitted.values)
+
+saveRDS(results_exp_precision, file = "./8-output/precision_ICC.Rds")
+
+#### plot all results and modeled curves
+plot <- results_exp_precision %>%
+  ggplot(aes(x=train.sample.size,color=method)) +
+  geom_point(aes(y=rep.ICC), size=0.5) +
+  geom_line(aes(y=rep.ICC.fit), linewidth=1.2)
+
+plot
+
+#### save model paramaters
+df <- data.frame(modelf=rep(NA,2),
+                 method=rep(NA,2),
+                 sample.type=rep(NA,2),
+                 ICC.a = rep(NA,2), ICC.k = rep(NA,2), max.ICC = rep(NA,2), 
+                 SE.ICC.a = rep(NA,2), SE.ICC.k = rep(NA,2), SE.max.ICC = rep(NA,2),
+                 RSE= rep(NA,2), DF = rep(NA,2))
+df[1,] <- c("f1","ElNet.clocks","blood",coef(modelf1),unname(summary(modelf1)$parameters[,2]), summary(modelf1)$sigma, summary(modelf1)$df[2])
+df[2,] <- c("f2","PC.ElNet.clocks","blood",coef(modelf2),unname(summary(modelf2)$parameters[,2]), summary(modelf2)$sigma, summary(modelf2)$df[2])
+
+df <- df %>% select(method,sample.type,ICC.a,SE.ICC.a,ICC.k,SE.ICC.k,max.ICC,SE.max.ICC,RSE,DF)
+df$ICC.a <- round(as.numeric(df$ICC.a), digits=1)
+df$SE.ICC.a <- round(as.numeric(df$SE.ICC.a), digits=1)
+df$ICC.k <- round(as.numeric(df$ICC.k), digits=2)
+df$SE.ICC.k <- round(as.numeric(df$SE.ICC.k), digits=2)
+df$max.ICC <- round(as.numeric(df$max.ICC), digits=4)
+df$SE.max.ICC <- round(as.numeric(df$SE.ICC.k), digits=4)
+df$RSE <- round(as.numeric(df$RSE), digits=3)
+
+saveRDS(df, file = "./8-output/precision_ICC_modelpar.Rds")
+
+```
+
+```{r}
+df %>% kbl() %>% kable_styling()
+```
+
+<br><br>
+
+##### Final CpGs or PC components in the trained models
+
+```{r, message=FALSE, echo=FALSE, fig.width=6, fig.height=4}
+
+plot <- results_exp %>%
+  ggplot(aes(x=train.sample.size,y=n.features,color=method)) +
+  geom_point() +
+  geom_smooth(method="lm", se=FALSE)
+
+plot
+
+```

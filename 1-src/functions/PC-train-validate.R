@@ -2,7 +2,7 @@
 # training either on age 
 
 PCTrainValidate <- function(beta_tr, pheno_tr,beta_val,pheno_val,beta_rep,pheno_rep) {
-  require(dplyr)
+  
   require(tidyverse)
   require(glmnet)
   require(irr)
@@ -51,7 +51,7 @@ PCTrainValidate <- function(beta_tr, pheno_tr,beta_val,pheno_val,beta_rep,pheno_
     ## ICC repeatablity set precision
     dat = pheno_rep
     dat$predAge = as.numeric(ageRep)
-    dat = dat %>% pivot_wider(id_cols=c("tg_id"),names_from = "rep",values_from = "predAge") %>% select(-tg_id)
+    dat = dat %>% pivot_wider(id_cols=c("patient_ID"),names_from = "rep",values_from = "predAge") %>% select(-patient_ID)
     out = icc(dat, model="twoway",type="agreement")
     
     ### final output 
