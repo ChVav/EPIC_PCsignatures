@@ -2,9 +2,9 @@
 
 # Check performance with increasing training set size
 # penalized regression, 10K cross-validation for each method
-# full FHS set used for training (2639 peripheral blood samples, GSE55763)
-# Hannum subset (479 samples withinsame age range as training, GSE40279) for testing accuracy
-# Technical reps from FHS for testing repeatability (2x36 reps)
+# full GSE55763 set used for training (2639 peripheral blood samples)
+# GSE40279 subset (479 samples within same age range as training) for testing accuracy
+# Technical reps from GSE55763 for testing repeatability (2x36 reps)
 # for training size sample input choose three levels of granularity (95 sample sizes/data points checked):
 # fine: n min = 34, n max = 54, n step = 5 
 # medium: n min = 59, n max = 1619, n step = 20 
@@ -31,7 +31,6 @@
 # Same experiment is repeated three times, results are then collated results
 
 library(tidyverse)
-library(ggplot2)
 
 dir.create("./7-output")
 
@@ -42,13 +41,13 @@ source("../../functions/PC-train-validate.R")
 
 ### Prepare data ###----
 ## Beta
-beta_tr_full <- readRDS("../../../0-data/beta/beta_BloodFHS_450K_imputed.Rds") # Training set - FHS, missing values imputed
+beta_tr_full <- readRDS("../../../0-data/beta/beta_BloodFull_450K_imputed.Rds") # Training set - GSE55763, missing values imputed
 beta_val <- readRDS("../../../0-data/beta/beta_Hannum_ExtVal.Rds") # Validation set accuracy - Hannum subset
-beta_rep <- readRDS("../../../0-data/beta/beta_BloodRep_450K_imputed.Rds") # validation set precision - technical reps FHS, missing values imputed
+beta_rep <- readRDS("../../../0-data/beta/beta_BloodRep_450K_imputed.Rds") # validation set precision - technical reps GSE55763, missing values imputed
 
 ## arrange pheno files
 #training
-pheno_tr_full <- readRDS("../../../0-data/pheno/pheno_BloodFHS_450K.Rds")
+pheno_tr_full <- readRDS("../../../0-data/pheno/pheno_BloodFull_450K.Rds")
 pheno_tr_full <- pheno_tr_full %>% 
   select(basename,age) %>% 
   filter(pheno_tr_full$basename %in% colnames(beta_tr_full)) %>% 

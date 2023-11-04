@@ -2,13 +2,11 @@
 
 # Check performance with increasing training set size
 # penalized regression, 10K cross-validation for each method
-# full GSE55763 set used for training (2639 peripheral blood samples)
-# GSE40279 subset (479 samples within same age range as training) for testing accuracy
-# Technical reps from GSE55763 for testing repeatability (2x36 reps)
-# for training size sample input choose three levels of granularity (95 sample sizes/data points checked):
-# fine: n min = 34, n max = 54, n step = 5 
-# medium: n min = 59, n max = 1619, n step = 20 
-# coarse: n min = 1639, n max = 2639, n step = 100 
+## full 3C discovery set used for training (no train-test split, cancers included)
+# 3C external validation/smears repeatability used for testing performance
+# for training size sample input choose two levels of granularity (95 sample sizes/data points checked):
+# fine: n min = 32, n max = 52, n step = 5 
+# coarser: n min = 57, n max = 1657, n step = 20 
 
 ### final output 1. dataframe:
 ## training parameters kept:
@@ -32,7 +30,7 @@
 
 library(tidyverse)
 
-dir.create("./6-output")
+dir.create("./1-output")
 
 ### Source scripts for training+predicting age in validation sets for testing accuracy/precision ###----
 
@@ -41,13 +39,13 @@ source("../../functions/PC-train-validate.R")
 
 ### Prepare data ###----
 ## Beta
-beta_tr_full <- readRDS("../../../0-data/beta/beta_BloodFull_450K_imputed.Rds") # Training set - GSE55763, missing values imputed
-beta_val <- readRDS("../../../0-data/beta/beta_Hannum_ExtVal.Rds") # Validation set accuracy - Hannum subset
-beta_rep <- readRDS("../../../0-data/beta/beta_BloodRep_450K_imputed.Rds") # validation set precision - technical reps GSE55763, missing values imputed
+beta_tr_full <- readRDS("../../../0-data/beta/beta_3CDisc.Rds") # Training set - 3C Discovery
+beta_val <- readRDS("../../../0-data/beta/beta_3CExtVal.Rds") # Validation set accuracy - 3C External validation
+beta_rep <- readRDS("../../../0-data/beta/beta_repeatability.Rds") # Validation set precision - Cervical smears Repeatability
 
 ## arrange pheno files
 #training
-pheno_tr_full <- readRDS("../../../0-data/pheno/pheno_BloodFull_450K.Rds")
+pheno_tr_full <- readRDS("../../../0-data/pheno/pheno_3CDisc.Rds")
 pheno_tr_full <- pheno_tr_full %>% 
   select(basename,age) %>% 
   filter(pheno_tr_full$basename %in% colnames(beta_tr_full)) %>% 
@@ -56,30 +54,31 @@ pheno_tr_full <- pheno_tr_full[match(colnames(beta_tr_full),pheno_tr_full$basena
 identical(colnames(beta_tr_full),pheno_tr_full$basename)
 
 # validation accuracy
-pheno_val <- readRDS("../../../0-data/pheno/pheno_Hannum_ExtVal.Rds") %>% dplyr::rename(age=Age,basename=sampleID)
+pheno_val <- readRDS("../../../0-data/pheno/pheno_3CExtVal.Rds")
 pheno_val <- pheno_val[match(colnames(beta_val),pheno_val$basename),]
 identical(colnames(beta_val),pheno_val$basename)
 age_val <- pheno_val %>% pull(age) %>% as.numeric()
 
 # validation precision
-pheno_rep <- readRDS("../../../0-data/pheno/pheno_BloodRep_450K.Rds")
+pheno_rep <- readRDS("../../../0-data/pheno/pheno_repeatability.Rds")
 pheno_rep <- pheno_rep %>%
-  dplyr::rename(patient_ID=sample) %>%
+  filter(sample_type=="Cervical_smear") %>% # kick out blood
   select(basename,patient_ID,rep) %>% #only keep necessary stuff
   droplevels()
+beta_rep <- beta_rep %>% select(c(pheno_rep$basename))  #keep smears only
 pheno_rep <- pheno_rep[match(colnames(beta_rep),pheno_rep$basename),]
 identical(colnames(beta_rep),pheno_rep$basename)
 
 ### Define list of samples to loop over and save age distribution ###----
-nr <- c(seq(from=34,to=54,by=5),seq(from=59,to=1619,by=20),seq(from=1639,to=2639,by=100))
+nr <- c(seq(from=32,to=52,by=5),seq(from=57,to=1657,by=20))
 
 sampleList <- list()
 for (i in 1:length(nr)){
-  set.seed(4+i)
+  set.seed(27+i)
   sampleList[[i]] <- sample(pheno_tr_full$basename,nr[i])
 }
 names(sampleList) <- nr
-saveRDS(sampleList, file="./6-output/sampleListloop.Rds") # fix list to repeat
+saveRDS(sampleList, file="./1-output/sampleListloop.Rds") # fix list to repeat
 
 # out.list - age distribution for different input sample sets - length (nmax-nmin/n) +1:
 out.list <- list()
@@ -87,7 +86,7 @@ for (j in 1:length(sampleList)){
   out.list[[j]] <- pheno_tr_full %>% filter(basename %in% sampleList[[j]]) %>% select(age,basename)
 }
 names(out.list) <- names(sampleList)
-saveRDS(out.list, file="./6-output/sampleListloopAges.Rds")
+saveRDS(out.list, file="./1-output/sampleListloopAges.Rds")
 
 ### Train and test different methods ###----
 # initialize out.df
@@ -131,5 +130,7 @@ for (j in 1:length(sampleList)){
   result$sample.type <- "blood"
   out.df <- full_join(out.df,result)
   
-  saveRDS(out.df, file="./6-output/results_training_size.Rds") # overwrite results at end of each loop as a means of saving temporary result
+  saveRDS(out.df, file="./1-output/results_training_size.Rds") # overwrite results at end of each loop as a means of saving temporary result
 }
+
+

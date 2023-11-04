@@ -29,10 +29,10 @@ dir.create("./8-output")
 ## combine results and save
 experiment1 <- readRDS("./5-output/results_training_size.Rds")
 experiment2 <- readRDS("./6-output/results_training_size.Rds")
-#experiment3 <- readRDS("./7-output/results_training_size.Rds")
+experiment3 <- readRDS("./7-output/results_training_size.Rds")
 
 results_exp <- full_join(experiment1,experiment2) %>% drop_na()
-#results_exp <- full_join(results_exp,experiment3) %>% drop_na()
+results_exp <- full_join(results_exp,experiment3) %>% drop_na()
 
 saveRDS(results_exp, file="./8-output/results_trainingsize_combined.Rds")
 
@@ -43,9 +43,9 @@ saveRDS(results_exp, file="./8-output/results_trainingsize_combined.Rds")
 Check performance clocks trained on original vs PCA-derived feature space with increasing training set size: <br>
 
 * Elastic net penalized regression, 10K cross-validation 
-* Training set: Framingham Heart study (450K), 2639 peripheral blood samples, age range: 23.7-75 (GSE55763; missing values imputed)
-* External validation accuracy: Hannum subset same age range (450K), 479 blood samples (GSE40279)
-* Validation repeatability: technical reps from FHS, 2x36 blood samples (missing values imputed)
+* Training set: GSE55763 (450K), 2639 peripheral blood samples, age range: 23.7-75 (missing values imputed)
+* External validation accuracy: GSE40279 subset with same age range as training (450K), 479 blood samples
+* Validation repeatability: technical reps from GSE55763, 2x36 blood samples (missing values imputed)
 * Randomly subsetting training set, three levels of granularity: <br>
      - fine: n min = 34, n max = 54, n step = 5 
      - medium: n min = 59, n max = 1619, n step = 20 
