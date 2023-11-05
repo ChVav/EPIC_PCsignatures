@@ -1,8 +1,6 @@
 # Copyright (c) 2023 Charlotte D. Vavourakis. Licensed under the MIT license (see LICENSE.md).
 
-library(ggplot2)
 library(patchwork)
-library(dplyr)
 library(tidyverse)
 library(rcartocolor)
 
