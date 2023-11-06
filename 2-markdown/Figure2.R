@@ -34,7 +34,7 @@ plota <- accuracy %>%
   scale_color_identity() + #guide="legend" adds a legend that is not useful, modify manually in Inscape
   scale_linetype_manual(values=c("solid", "dashed"))+
   labs(color="", shape = "", linetype = "") +
-  ylab("Accuracy \n [slope regression age vs predicted age]") +
+  ylab("Slope regression age vs predicted age") +
   xlab('n training samples \n from "BloodFull_450K"') +
   ylim(0, 1) +
   theme_minimal() +
@@ -49,11 +49,11 @@ plotb <- precision %>%
   scale_color_identity() +
   scale_linetype_manual(values=c("solid", "dashed"))+
   labs(color="", shape = "", linetype = "") +
-  ylab("Reliability \n [ICC]") +
+  ylab("ICC") +
   xlab('n training samples \n from "BloodFull_450K"') +
   ylim(0, 1) +
   theme_minimal() +
-  ggtitle('Repeatability in "BloodRep_450K" test set')
+  ggtitle('Reliability in "BloodRep_450K" test set')
 
 ## Experiment EPIC cervical smear samples  ##----
 accuracy <- readRDS("../1-src/analysis/3-training-size-experiment/4-output/accuracy_slope.Rds")
@@ -78,7 +78,7 @@ plotc <- accuracy %>%
   scale_color_identity() + #guide="legend" adds a legend that is not useful, modify manually in Inscape
   scale_linetype_manual(values=c("solid", "dashed"))+
   labs(color="", shape = "", linetype = "") +
-  ylab("Accuracy \n [slope regression age vs predicted age]") +
+  ylab("Slope regression age vs predicted age") +
   xlab('n training samples \n from "3CDisc"') +
   ylim(0, 1) +
   theme_minimal() +
@@ -93,11 +93,11 @@ plotd <- precision %>%
   scale_color_identity() +
   scale_linetype_manual(values=c("solid", "dashed"))+
   labs(color="", shape = "", linetype = "") +
-  ylab("Reliability \n [ICC]") +
+  ylab("ICC") +
   xlab('n training samples \n from "3CDisc"') +
   ylim(0, 1) +
   theme_minimal() +
-  ggtitle('Repeatability in "repeatability" test set')
+  ggtitle('Reliability in "repeatability" test set')
 
 
 ## combined plot  ##----
