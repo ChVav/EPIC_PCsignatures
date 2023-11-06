@@ -35,10 +35,10 @@ plota <- accuracy %>%
   scale_linetype_manual(values=c("solid", "dashed"))+
   labs(color="", shape = "", linetype = "") +
   ylab("Accuracy \n [slope regression age vs predicted age]") +
-  xlab('n training samples \n from "Hannum"') +
+  xlab('n training samples \n from "BloodFull_450K"') +
   ylim(0, 1) +
   theme_minimal() +
-  ggtitle('Accuracy in "BloodFull_450K" test set')
+  ggtitle('Accuracy in "Hannum" test set')
 
 plotb <- precision %>%
   filter(method %in% c("ElNet","PC")) %>% 
@@ -50,7 +50,7 @@ plotb <- precision %>%
   scale_linetype_manual(values=c("solid", "dashed"))+
   labs(color="", shape = "", linetype = "") +
   ylab("Reliability \n [ICC]") +
-  xlab('n training samples \n from "Hannum"') +
+  xlab('n training samples \n from "BloodFull_450K"') +
   ylim(0, 1) +
   theme_minimal() +
   ggtitle('Repeatability in "BloodRep_450K" test set')
