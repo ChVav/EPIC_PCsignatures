@@ -10,7 +10,6 @@
 #### 1. prep training set ----
 
 library(tidyverse)
-library(dplyr)
 library(openxlsx)
 library(glmnet)
 library(methylclock)

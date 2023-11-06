@@ -7,9 +7,9 @@ output:
     number_sections: false
 ---
 
-```{r setup, include=FALSE, message=FALSE, echo=FALSE}
-
 ##### Copyright (c) 2023 Charlotte D. Vavourakis. Licensed under the MIT license (see LICENSE.md).
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE}
 
 library(knitr)
 library(tidyverse)

@@ -5,7 +5,6 @@
 #https://dnamage.genetics.ucla.edu/ (various settings tested)
 
 library(tidyverse)
-library(dplyr)
 library(methylclock)
 library(openxlsx)
 
@@ -42,6 +41,18 @@ identical(round(pheno$Hannum.EUTOPS, digits=4), round(pheno$Hannum.higgins,digit
 # update pheno
 saveRDS(pheno, file="./1-output/pheno_BloodRep_450K_Hannum.Rds")
 
+### calculate hannum original clock for BloodFull_450K
+## load pheno/beta blood_rep set
+pheno <- readRDS("../../../0-data/pheno/pheno_BloodFull_450K.Rds")
+beta <- readRDS("../../../0-data/beta/beta_BloodFull_450K.Rds")
+
+## calculate clocks and add to pheno
+#cpgs.missing <- checkClocks(beta) # test for missing CpGs (80% of CpGs in clock should be there)
+beta <- beta %>% rownames_to_column(var="ProbeID")
+Hannum.EUTOPS <- DNAmAge(beta, clocks="Hannum") # missing data is imputed, normalization = set to FALSE by default (assumed data was already normalized)
+identical(Hannum.EUTOPS$id,pheno$basename) #sanity-check, should be TRUE
+pheno$Hannum <- Hannum.EUTOPS$Hannum
+saveRDS(pheno, file="./1-output/pheno_BloodFull_450K_Hannum.Rds")
 
 
 

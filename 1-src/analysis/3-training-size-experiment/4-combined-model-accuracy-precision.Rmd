@@ -1,5 +1,5 @@
 ---
-title: "Modeling Accuracy (slope or MSE) and Precision for combined experiments"
+title: "Modeling Accuracy (slope or MSE) and Precision for combined experiments on cervical smear samples"
 output:
   html_document:
     code_folding: hide
@@ -11,11 +11,8 @@ output:
 
 ```{r setup, include=FALSE, message=FALSE, echo=FALSE}
 
-
 library(knitr)
-library(dplyr)
 library(tidyverse)
-library(ggplot2)
 library(patchwork)
 library(kableExtra)
 
@@ -30,41 +27,16 @@ dir.create("./4-output")
 ```{r, echo=FALSE, message=FALSE, echo=FALSE}
 
 ## combine results and save
-experiment1 <- readRDS("./1-output/results_training_size.Rds") %>%
-  mutate(modelf=case_when(method=="ElNet"&input.CpGs=="all" ~ "f1",
-                          method=="ElNet"&input.CpGs=="unreliable.removed" ~ "f2",
-                          method=="PC"&input.CpGs=="all" ~ "f3",
-                          method=="PC"&input.CpGs=="unreliable.removed" ~ "f4",
-                          method=="Lasso"&input.CpGs=="all" ~ "f5",
-                          method=="Lasso"&input.CpGs=="unreliable.removed" ~ "f6"))
+experiment1 <- readRDS("./1-output/results_training_size.Rds")
+experiment2 <- readRDS("./2-output/results_training_size.Rds")
+experiment3 <- readRDS("./3-output/results_training_size.Rds")
 
-experiment2 <- readRDS("./2-output/results_training_size.Rds") %>%
-  mutate(modelf=case_when(method=="ElNet"&input.CpGs=="all" ~ "f1",
-                          method=="ElNet"&input.CpGs=="unreliable.removed" ~ "f2",
-                          method=="PC"&input.CpGs=="all" ~ "f3",
-                          method=="PC"&input.CpGs=="unreliable.removed" ~ "f4",
-                          method=="Lasso"&input.CpGs=="all" ~ "f5",
-                          method=="Lasso"&input.CpGs=="unreliable.removed" ~ "f6"))
-
-experiment3 <- readRDS("./3-output/results_training_size.Rds") %>%
-  mutate(modelf=case_when(method=="ElNet"&input.CpGs=="all" ~ "f1",
-                          method=="ElNet"&input.CpGs=="unreliable.removed" ~ "f2",
-                          method=="PC"&input.CpGs=="all" ~ "f3",
-                          method=="PC"&input.CpGs=="unreliable.removed" ~ "f4",
-                          method=="Lasso"&input.CpGs=="all" ~ "f5",
-                          method=="Lasso"&input.CpGs=="unreliable.removed" ~ "f6"))
-
-results_exp <- full_join(experiment1,experiment2)
+results_exp <- full_join(experiment1,experiment2) %>% drop_na()
 results_exp <- full_join(results_exp,experiment3) %>% drop_na()
 
 saveRDS(results_exp, file="./4-output/results_trainingsize_combined.Rds")
 
-
-
-
 ```
-
-
 
 ## Model accuracy
 
@@ -83,52 +55,41 @@ powerLaw1 <- function(x,a,b,c){
     c-(a*(x^b))
 }
 
-#### method 1
-## model fits
-# find starting parameters
-ymax <- results_exp[results_exp$modelf == 'f1',] %>% pull(val.slope.regress) %>% max()
-fit <- lm(log(val.slope.regress)~log(train.sample.size), data=results_exp[results_exp$modelf == 'f1',])
+#### Elastic net trained in original feature-space
+# find starting parameters for model fits
+ymax <- results_exp[results_exp$method == 'ElNet',] %>% pull(val.slope.regress) %>% max()
+fit <- lm(log(val.slope.regress)~log(train.sample.size), data=results_exp[results_exp$method == 'ElNet',])
 as <- unname(fit$coefficients[2]) #slope
 bs <- unname(fit$coefficients[1]) #intercept
 # check plot(fit)
 
-test <- unique(results_exp$train.sample.size)
-testy <- 1 - 100*(test**-1.2) #fiddled around with a
-df <- data.frame(x=test,y=testy)
-#plot(df)
-
-check <- results_exp[results_exp$modelf == 'f1',] %>%
-  ggplot(aes(x=train.sample.size,y=val.slope.regress,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = 100, b = bs, c = ymax))
-
 # fit and check fit
-modelf1 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f1',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+modelf1 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'ElNet',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
 
-plota <- results_exp[results_exp$modelf == 'f1',] %>%
-  ggplot(aes(x=train.sample.size,y=val.slope.regress,color=input.CpGs)) +
+plota <- results_exp[results_exp$method == 'ElNet',] %>%
+  ggplot(aes(x=train.sample.size,y=val.slope.regress)) +
   geom_point() +
   geom_function(fun = powerLaw1, args = list(a = coef(modelf1)[1], b = coef(modelf1)[2], c = coef(modelf1)[3]))
 
 # save results
-f1.fitted.values <- results_exp[results_exp$modelf == 'f1',] %>% mutate(val.slope.regress.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
+f1.fitted.values <- results_exp[results_exp$method == 'ElNet',] %>% mutate(val.slope.regress.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
 
 doublecheck <- f1.fitted.values %>%
   ggplot(aes(x=train.sample.size)) +
   geom_point(aes(y=val.slope.regress)) +
   geom_line(aes(y=val.slope.regress.fit))
 
-#### method 2
+#### Elastic net trained on PCA-derived features
 # try same start parameters first
-modelf2 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f2',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+modelf2 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'PC',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
 
-plotb <- results_exp[results_exp$modelf == 'f2',] %>%
-  ggplot(aes(x=train.sample.size,y=val.slope.regress,color=input.CpGs)) +
+plotb <- results_exp[results_exp$method == 'PC',] %>%
+  ggplot(aes(x=train.sample.size,y=val.slope.regress)) +
   geom_point() +
   geom_function(fun = powerLaw1, args = list(a = coef(modelf2)[1], b = coef(modelf2)[2], c = coef(modelf2)[3]))
 
 # save results
-f2.fitted.values <- results_exp[results_exp$modelf == 'f2',] %>% mutate(val.slope.regress.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
+f2.fitted.values <- results_exp[results_exp$method == 'PC',] %>% mutate(val.slope.regress.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
 
 doublecheck <- f2.fitted.values %>%
   ggplot(aes(x=train.sample.size)) +
@@ -137,126 +98,41 @@ doublecheck <- f2.fitted.values %>%
 
 results_exp_accuracy <- full_join(f1.fitted.values,f2.fitted.values)
 
-#### method 3
-# try same start parameters first
-modelf3 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f3',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotc <- results_exp[results_exp$modelf == 'f3',] %>%
-  ggplot(aes(x=train.sample.size,y=val.slope.regress,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf3)[1], b = coef(modelf3)[2], c = coef(modelf3)[3]))
-
-# save results
-f3.fitted.values <- results_exp[results_exp$modelf == 'f3',] %>% mutate(val.slope.regress.fit = coef(modelf3)[3] - coef(modelf3)[1]*(train.sample.size**coef(modelf3)[2]))
-
-doublecheck <- f3.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.slope.regress)) +
-  geom_line(aes(y=val.slope.regress.fit))
-
-results_exp_accuracy <- full_join(results_exp_accuracy,f3.fitted.values)
-
-#### method 4
-# try same start parameters first
-modelf4 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f4',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotd <- results_exp[results_exp$modelf == 'f4',] %>%
-  ggplot(aes(x=train.sample.size,y=val.slope.regress,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf4)[1], b = coef(modelf4)[2], c = coef(modelf4)[3]))
-
-# save results
-f4.fitted.values <- results_exp[results_exp$modelf == 'f4',] %>% mutate(val.slope.regress.fit = coef(modelf4)[3] - coef(modelf4)[1]*(train.sample.size**coef(modelf4)[2]))
-
-doublecheck <- f4.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.slope.regress)) +
-  geom_line(aes(y=val.slope.regress.fit))
-
-results_exp_accuracy <- full_join(results_exp_accuracy,f4.fitted.values)
-
-#### method 5
-# try same start parameters first
-modelf5 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f5',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plote <- results_exp[results_exp$modelf == 'f5',] %>%
-  ggplot(aes(x=train.sample.size,y=val.slope.regress,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf5)[1], b = coef(modelf5)[2], c = coef(modelf5)[3]))
-
-# save results
-f5.fitted.values <- results_exp[results_exp$modelf == 'f5',] %>% mutate(val.slope.regress.fit = coef(modelf5)[3] - coef(modelf5)[1]*(train.sample.size**coef(modelf5)[2]))
-
-doublecheck <- f5.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.slope.regress)) +
-  geom_line(aes(y=val.slope.regress.fit))
-
-results_exp_accuracy <- full_join(results_exp_accuracy,f5.fitted.values)
-
-#### method 6
-# try same start parameters first
-modelf6 <- nls(val.slope.regress ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f6',], start = list(a=100, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotf <- results_exp[results_exp$modelf == 'f6',] %>%
-  ggplot(aes(x=train.sample.size,y=val.slope.regress,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf6)[1], b = coef(modelf6)[2], c = coef(modelf6)[3]))
-
-# save results
-f6.fitted.values <- results_exp[results_exp$modelf == 'f6',] %>% mutate(val.slope.regress.fit = coef(modelf6)[3] - coef(modelf6)[1]*(train.sample.size**coef(modelf6)[2]))
-
-doublecheck <- f6.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.slope.regress)) +
-  geom_line(aes(y=val.slope.regress.fit))
-
-results_exp_accuracy <- full_join(results_exp_accuracy,f6.fitted.values)
-
 saveRDS(results_exp_accuracy, file = "./4-output/accuracy_slope.Rds")
 
 #### plot all results and modeled curves
 plot <- results_exp_accuracy %>%
-  ggplot(aes(x=train.sample.size,color=input.CpGs)) +
+  ggplot(aes(x=train.sample.size,color=method)) +
   geom_point(aes(y=val.slope.regress), size=0.5) +
-  geom_line(aes(y=val.slope.regress.fit), size=1.2) +
-  facet_wrap(~method)
+  geom_line(aes(y=val.slope.regress.fit), linewidth=1.2) 
 
 plot
 
 #### save model paramaters
-df <- data.frame(modelf=rep(NA,6), 
-                 slope.a = rep(NA,6), slope.k = rep(NA,6), max.slope = rep(NA,6), 
-                 SE.slope.a = rep(NA,6), SE.slope.k = rep(NA,6), SE.max.slope = rep(NA,6),
-                 RSE= rep(NA,6), DF = rep(NA,6))
-df[1,] <- c("f1",coef(modelf1),unname(summary(modelf1)$parameters[,2]), summary(modelf1)$sigma, summary(modelf1)$df[2])
-df[2,] <- c("f2",coef(modelf2),unname(summary(modelf2)$parameters[,2]), summary(modelf2)$sigma, summary(modelf2)$df[2])
-df[3,] <- c("f3",coef(modelf3),unname(summary(modelf3)$parameters[,2]), summary(modelf3)$sigma, summary(modelf3)$df[2])
-df[4,] <- c("f4",coef(modelf4),unname(summary(modelf4)$parameters[,2]), summary(modelf4)$sigma, summary(modelf4)$df[2])
-df[5,] <- c("f5",coef(modelf5),unname(summary(modelf5)$parameters[,2]), summary(modelf5)$sigma, summary(modelf5)$df[2])
-df[6,] <- c("f6",coef(modelf6),unname(summary(modelf6)$parameters[,2]), summary(modelf6)$sigma, summary(modelf6)$df[2])
+df <- data.frame(modelf=rep(NA,2), 
+                 method=rep(NA,2),
+                 sample.type=rep(NA,2),
+                 slope.a = rep(NA,2), slope.k = rep(NA,2), max.slope = rep(NA,2), 
+                 SE.slope.a = rep(NA,2), SE.slope.k = rep(NA,2), SE.max.slope = rep(NA,2),
+                 RSE= rep(NA,2), DF = rep(NA,2))
+df[1,] <- c("f1","ElNet.clocks","cervical.smear",coef(modelf1),unname(summary(modelf1)$parameters[,2]), summary(modelf1)$sigma, summary(modelf1)$df[2])
+df[2,] <- c("f2","PC.ElNet.clocks","cervical.smear",coef(modelf2),unname(summary(modelf2)$parameters[,2]), summary(modelf2)$sigma, summary(modelf2)$df[2])
 
-parTable <- df %>%
-  mutate(method = case_when(
-    modelf=="f1" ~ "ElNet", modelf=="f2" ~ "ElNet.unreliable.removed",
-    modelf=="f3" ~ "PC.ElNet", modelf=="f4" ~ "PC.ElNet.unreliable.removed",
-    modelf=="f5" ~ "Lasso", modelf=="f6" ~ "Lasso.unreliable.removed"
-  )) %>%
-  select(method,slope.a,SE.slope.a,slope.k,SE.slope.k,max.slope,SE.max.slope,RSE,DF)
-parTable$slope.a <- round(as.numeric(parTable$slope.a), digits=2)
-parTable$SE.slope.a <- round(as.numeric(parTable$SE.slope.a), digits=2)
-parTable$slope.k <- round(as.numeric(parTable$slope.k), digits=2)
-parTable$SE.slope.k <- round(as.numeric(parTable$SE.slope.k), digits=2)
-parTable$max.slope <- round(as.numeric(parTable$max.slope), digits=3)
-parTable$SE.max.slope <- round(as.numeric(parTable$SE.slope.k), digits=3)
-parTable$RSE <- round(as.numeric(parTable$RSE), digits=2)
+df <- df %>% select(method,sample.type,slope.a,SE.slope.a,slope.k,SE.slope.k,max.slope,SE.max.slope,RSE,DF)
+df$slope.a <- round(as.numeric(df$slope.a), digits=1)
+df$SE.slope.a <- round(as.numeric(df$SE.slope.a), digits=1)
+df$slope.k <- round(as.numeric(df$slope.k), digits=2)
+df$SE.slope.k <- round(as.numeric(df$SE.slope.k), digits=2)
+df$max.slope <- round(as.numeric(df$max.slope), digits=3)
+df$SE.max.slope <- round(as.numeric(df$SE.slope.k), digits=3)
+df$RSE <- round(as.numeric(df$RSE), digits=2)
 
-saveRDS(parTable, file="./4-output/accuracy_slope_modelpar.Rds")
+saveRDS(df, file="./4-output/accuracy_slope_modelpar.Rds")
 
 ```
 
 ```{r}
-parTable %>% kbl() %>% kable_styling()
+df %>% kbl() %>% kable_styling()
 ```
 
 <br>
@@ -271,57 +147,41 @@ parTable %>% kbl() %>% kable_styling()
 
 ```{r, message=FALSE, echo=FALSE, fig.width=12, fig.height=4}
 
-#### method 1
-## model fits
-
-# find starting parameters
-ymin <- results_exp[results_exp$modelf == 'f1',] %>% pull(val.MSE) %>% min()
-fit <- lm(log(val.MSE)~log(train.sample.size), data=results_exp[results_exp$modelf == 'f1',])
+#### Elastic net trained in original feature-space
+# find starting parameters for model fits
+ymin <- results_exp[results_exp$method == 'ElNet',] %>% pull(val.MSE) %>% min()
+fit <- lm(log(val.MSE)~log(train.sample.size), data=results_exp[results_exp$method == 'ElNet',])
 as <- unname(fit$coefficients[2]) #slope
 bs <- unname(fit$coefficients[1]) #intercept
 # check plot(fit)
 
-test <- unique(results_exp$train.sample.size)
-testy1 <- ymin - (as*(test**-bs))
-testy2 <- powerLaw1(x=test,a=as,b=-bs,c=ymin)
-df1 <- data.frame(x=test,y=testy2, check="original")
-testy2 <- powerLaw1(x=test,a=-10000,b=-1,c=ymin)
-df2 <- data.frame(x=test,y=testy2, check="fiddling")
-df <- full_join(df1,df2)
-check <- df %>% ggplot(aes(x=x,y=y,color=check)) + geom_point()
-
-check <- results_exp[results_exp$modelf == 'f1',] %>%
-  ggplot(aes(x=train.sample.size,y=val.MSE,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = -10000, b = -1, c = ymin))
-
 # fit and check fit
-modelf1 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f1',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
+modelf1 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'ElNet',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
 
-plota <- results_exp[results_exp$modelf == 'f1',] %>%
-  ggplot(aes(x=train.sample.size,y=val.MSE,color=input.CpGs)) +
+plota <- results_exp[results_exp$method == 'ElNet',] %>%
+  ggplot(aes(x=train.sample.size,y=val.MSE)) +
   geom_point() +
   geom_function(fun = powerLaw1, args = list(a = coef(modelf1)[1], b = coef(modelf1)[2], c = coef(modelf1)[3]))
 
 # save results
-f1.fitted.values <- results_exp[results_exp$modelf == 'f1',] %>% mutate(val.MSE.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
+f1.fitted.values <- results_exp[results_exp$method == 'ElNet',] %>% mutate(val.MSE.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
 
 doublecheck <- f1.fitted.values %>%
   ggplot(aes(x=train.sample.size)) +
   geom_point(aes(y=val.MSE)) +
   geom_line(aes(y=val.MSE.fit))
 
-#### method 2
+#### Elastic net trained on PCA-derived features
 # try same start parameters first
-modelf2 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f2',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
+modelf2 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'PC',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
 
-plotb <- results_exp[results_exp$modelf == 'f2',] %>%
-  ggplot(aes(x=train.sample.size,y=val.MSE,color=input.CpGs)) +
+plotc <- results_exp[results_exp$method == 'PC',] %>%
+  ggplot(aes(x=train.sample.size,y=val.MSE)) +
   geom_point() +
   geom_function(fun = powerLaw1, args = list(a = coef(modelf2)[1], b = coef(modelf2)[2], c = coef(modelf2)[3]))
 
 # save results
-f2.fitted.values <- results_exp[results_exp$modelf == 'f2',] %>% mutate(val.MSE.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
+f2.fitted.values <- results_exp[results_exp$method == 'PC',] %>% mutate(val.MSE.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
 
 doublecheck <- f2.fitted.values %>%
   ggplot(aes(x=train.sample.size)) +
@@ -330,90 +190,13 @@ doublecheck <- f2.fitted.values %>%
 
 results_exp_accuracy2 <- full_join(f1.fitted.values,f2.fitted.values)
 
-#### method 3
-# try same start parameters first
-modelf3 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f3',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotc <- results_exp[results_exp$modelf == 'f3',] %>%
-  ggplot(aes(x=train.sample.size,y=val.MSE,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf3)[1], b = coef(modelf3)[2], c = coef(modelf3)[3]))
-
-# save results
-f3.fitted.values <- results_exp[results_exp$modelf == 'f3',] %>% mutate(val.MSE.fit = coef(modelf3)[3] - coef(modelf3)[1]*(train.sample.size**coef(modelf3)[2]))
-
-doublecheck <- f3.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.MSE)) +
-  geom_line(aes(y=val.MSE.fit))
-
-results_exp_accuracy2 <- full_join(results_exp_accuracy2,f3.fitted.values)
-
-#### method 4
-# try same start parameters first
-modelf4 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f4',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotd <- results_exp[results_exp$modelf == 'f4',] %>%
-  ggplot(aes(x=train.sample.size,y=val.MSE,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf4)[1], b = coef(modelf4)[2], c = coef(modelf4)[3]))
-
-# save results
-f4.fitted.values <- results_exp[results_exp$modelf == 'f4',] %>% mutate(val.MSE.fit = coef(modelf4)[3] - coef(modelf4)[1]*(train.sample.size**coef(modelf4)[2]))
-
-doublecheck <- f4.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.MSE)) +
-  geom_line(aes(y=val.MSE.fit))
-
-results_exp_accuracy2 <- full_join(results_exp_accuracy2,f4.fitted.values)
-
-#### method 5
-# try same start parameters first
-modelf5 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f5',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plote <- results_exp[results_exp$modelf == 'f5',] %>%
-  ggplot(aes(x=train.sample.size,y=val.MSE,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf5)[1], b = coef(modelf5)[2], c = coef(modelf5)[3]))
-
-# save results
-f5.fitted.values <- results_exp[results_exp$modelf == 'f5',] %>% mutate(val.MSE.fit = coef(modelf5)[3] - coef(modelf5)[1]*(train.sample.size**coef(modelf5)[2]))
-
-doublecheck <- f5.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.MSE)) +
-  geom_line(aes(y=val.MSE.fit))
-
-results_exp_accuracy2 <- full_join(results_exp_accuracy2,f5.fitted.values)
-
-#### method 6
-# try same start parameters first
-modelf6 <- nls(val.MSE ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f6',], start = list(a=-10000, b=-1, c=ymin), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotf <- results_exp[results_exp$modelf == 'f6',] %>%
-  ggplot(aes(x=train.sample.size,y=val.MSE,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf6)[1], b = coef(modelf6)[2], c = coef(modelf6)[3]))
-
-# save results
-f6.fitted.values <- results_exp[results_exp$modelf == 'f6',] %>% mutate(val.MSE.fit = coef(modelf6)[3] - coef(modelf6)[1]*(train.sample.size**coef(modelf6)[2]))
-
-doublecheck <- f6.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=val.MSE)) +
-  geom_line(aes(y=val.MSE.fit))
-
-results_exp_accuracy2 <- full_join(results_exp_accuracy2,f6.fitted.values)
-
 saveRDS(results_exp_accuracy2, file = "./4-output/accuracy_MSE.Rds")
 
 #### plot all results and modeled curves
 plot <- results_exp_accuracy2 %>%
-  ggplot(aes(x=train.sample.size,color=input.CpGs)) +
+  ggplot(aes(x=train.sample.size,color=method)) +
   geom_point(aes(y=val.MSE), size=0.5) +
-  geom_line(aes(y=val.MSE.fit), size=1.2) +
-  facet_wrap(~method)
+  geom_line(aes(y=val.MSE.fit), linewidth=1.2) 
 
 plot
 
@@ -433,52 +216,54 @@ plot
 
 ```{r, message=FALSE, echo=FALSE, fig.width=12, fig.height=4}
 
-#### method 1
-## model fits
-
-# find starting parameters
-ymax <- results_exp[results_exp$modelf == 'f1',] %>% pull(rep.ICC) %>% max()
-fit <- lm(log(rep.ICC)~log(train.sample.size), data=results_exp[results_exp$modelf == 'f1',])
+#### Elastic net trained in original feature-space
+# find starting parameters for model fits
+ymax <- results_exp[results_exp$method == 'ElNet',] %>% pull(rep.ICC) %>% max()
+fit <- lm(log(rep.ICC)~log(train.sample.size), data=results_exp[results_exp$method == 'ElNet',])
 as <- unname(fit$coefficients[2]) #slope
 bs <- unname(fit$coefficients[1]) #intercept
 
-test <- unique(results_exp$train.sample.size)
-testy <- ymax - as*(test**bs)
-df <- data.frame(x=test,y=testy)
-#plot(df)
-
-check <- results_exp[results_exp$modelf == 'f1',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = 0.1, b = bs, c = ymax))
+# test <- unique(results_exp$train.sample.size)
+# testy <- ymax - as*(test**bs)
+# df <- data.frame(x=test,y=testy)
+# #plot(df)
+# check <- results_exp[results_exp$method == 'ElNet',] %>%
+#   ggplot(aes(x=train.sample.size,y=rep.ICC)) +
+#   geom_point() +
+#   geom_function(fun = powerLaw1, args = list(a = 0.05, b = bs, c = ymax))
 
 # fit and check fit
-modelf1 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f1',], start = list(a=0.05, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+modelf1 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'ElNet',], start = list(a=0.05, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
 
-plota <- results_exp[results_exp$modelf == 'f1',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
+plota <- results_exp[results_exp$method == 'ElNet',] %>%
+  ggplot(aes(x=train.sample.size,y=rep.ICC)) +
   geom_point() +
   geom_function(fun = powerLaw1, args = list(a = coef(modelf1)[1], b = coef(modelf1)[2], c = coef(modelf1)[3]))
 
 # save results
-f1.fitted.values <- results_exp[results_exp$modelf == 'f1',] %>% mutate(rep.ICC.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
+f1.fitted.values <- results_exp[results_exp$method == 'ElNet',] %>% mutate(rep.ICC.fit = coef(modelf1)[3] - coef(modelf1)[1]*(train.sample.size**coef(modelf1)[2]))
 
 doublecheck <- f1.fitted.values %>%
   ggplot(aes(x=train.sample.size)) +
   geom_point(aes(y=rep.ICC)) +
   geom_line(aes(y=rep.ICC.fit))
 
-#### method 2
-# try same start parameters first
-modelf2 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f2',], start = list(a=0.05, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+#### Elastic net trained on PCA-derived features
+# find starting parameters for model fits
+ymax <- results_exp[results_exp$method == 'PC',] %>% pull(rep.ICC) %>% max()
+fit <- lm(log(rep.ICC)~log(train.sample.size), data=results_exp[results_exp$method == 'PC',])
+as <- unname(fit$coefficients[2]) #slope
+bs <- unname(fit$coefficients[1]) #intercept
 
-plotb <- results_exp[results_exp$modelf == 'f2',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
+modelf2 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$method == 'PC',], start = list(a=1, b=-1, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
+
+plotb <- results_exp[results_exp$method == 'PC',] %>%
+  ggplot(aes(x=train.sample.size,y=rep.ICC)) +
   geom_point() +
   geom_function(fun = powerLaw1, args = list(a = coef(modelf2)[1], b = coef(modelf2)[2], c = coef(modelf2)[3]))
 
 # save results
-f2.fitted.values <- results_exp[results_exp$modelf == 'f2',] %>% mutate(rep.ICC.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
+f2.fitted.values <- results_exp[results_exp$method == 'PC',] %>% mutate(rep.ICC.fit = coef(modelf2)[3] - coef(modelf2)[1]*(train.sample.size**coef(modelf2)[2]))
 
 doublecheck <- f2.fitted.values %>%
   ggplot(aes(x=train.sample.size)) +
@@ -487,147 +272,41 @@ doublecheck <- f2.fitted.values %>%
 
 results_exp_precision <- full_join(f1.fitted.values,f2.fitted.values)
 
-#### method 3
-# find starting parameters
-ymax <- results_exp[results_exp$modelf == 'f3',] %>% pull(rep.ICC) %>% max()
-fit <- lm(log(rep.ICC)~log(train.sample.size), data=results_exp[results_exp$modelf == 'f3',])
-as <- unname(fit$coefficients[2]) #slope
-bs <- unname(fit$coefficients[1]) #intercept
-
-test <- unique(results_exp$train.sample.size)
-testy <- ymax - as*(test**bs)
-df <- data.frame(x=test,y=testy)
-#plot(df)
-
-check <- results_exp[results_exp$modelf == 'f3',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = 1, b = -1, c = ymax))
-
-modelf3 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f3',], start = list(a=1, b=-1, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotc <- results_exp[results_exp$modelf == 'f3',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf3)[1], b = coef(modelf3)[2], c = coef(modelf3)[3]))
-
-# save results
-f3.fitted.values <- results_exp[results_exp$modelf == 'f3',] %>% mutate(rep.ICC.fit = coef(modelf3)[3] - coef(modelf3)[1]*(train.sample.size**coef(modelf3)[2]))
-
-doublecheck <- f3.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=rep.ICC)) +
-  geom_line(aes(y=rep.ICC.fit))
-
-results_exp_precision <- full_join(results_exp_precision,f3.fitted.values)
-
-#### method 4
-# try same start parameters first
-modelf4 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f4',], start = list(a=1, b=-1, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotd <- results_exp[results_exp$modelf == 'f4',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf4)[1], b = coef(modelf4)[2], c = coef(modelf4)[3]))
-
-# save results
-f4.fitted.values <- results_exp[results_exp$modelf == 'f4',] %>% mutate(rep.ICC.fit = coef(modelf4)[3] - coef(modelf4)[1]*(train.sample.size**coef(modelf4)[2]))
-
-doublecheck <- f4.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=rep.ICC)) +
-  geom_line(aes(y=rep.ICC.fit))
-
-results_exp_precision <- full_join(results_exp_precision,f4.fitted.values)
-
-#### method 5
-# find start parameters
-# find starting parameters
-ymax <- results_exp[results_exp$modelf == 'f5',] %>% pull(rep.ICC) %>% max()
-fit <- lm(log(rep.ICC)~log(train.sample.size), data=results_exp[results_exp$modelf == 'f5',])
-as <- unname(fit$coefficients[2]) #slope
-bs <- unname(fit$coefficients[1]) #intercept
-
-modelf5 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f5',], start = list(a=0.1, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plote <- results_exp[results_exp$modelf == 'f5',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf5)[1], b = coef(modelf5)[2], c = coef(modelf5)[3]))
-
-# save results
-f5.fitted.values <- results_exp[results_exp$modelf == 'f5',] %>% mutate(rep.ICC.fit = coef(modelf5)[3] - coef(modelf5)[1]*(train.sample.size**coef(modelf5)[2]))
-
-doublecheck <- f5.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=rep.ICC)) +
-  geom_line(aes(y=rep.ICC.fit))
-
-results_exp_precision <- full_join(results_exp_precision,f5.fitted.values)
-
-#### method 6
-# try same start parameters first
-modelf6 <- nls(rep.ICC ~ c - (a*train.sample.size^b), results_exp[results_exp$modelf == 'f6',], start = list(a=0.1, b=bs, c=ymax), nls.control(maxiter = 1000, warnOnly = TRUE))
-
-plotf <- results_exp[results_exp$modelf == 'f6',] %>%
-  ggplot(aes(x=train.sample.size,y=rep.ICC,color=input.CpGs)) +
-  geom_point() +
-  geom_function(fun = powerLaw1, args = list(a = coef(modelf6)[1], b = coef(modelf6)[2], c = coef(modelf6)[3]))
-
-# save results
-f6.fitted.values <- results_exp[results_exp$modelf == 'f6',] %>% mutate(rep.ICC.fit = coef(modelf6)[3] - coef(modelf6)[1]*(train.sample.size**coef(modelf6)[2]))
-
-doublecheck <- f6.fitted.values %>%
-  ggplot(aes(x=train.sample.size)) +
-  geom_point(aes(y=rep.ICC)) +
-  geom_line(aes(y=rep.ICC.fit))
-
-results_exp_precision <- full_join(results_exp_precision,f6.fitted.values)
-
 saveRDS(results_exp_precision, file = "./4-output/precision_ICC.Rds")
 
 #### plot all results and modeled curves
 plot <- results_exp_precision %>%
-  ggplot(aes(x=train.sample.size,color=input.CpGs)) +
+  ggplot(aes(x=train.sample.size,color=method)) +
   geom_point(aes(y=rep.ICC), size=0.5) +
-  geom_line(aes(y=rep.ICC.fit), size=1.2) +
-  facet_wrap(~method)
+  geom_line(aes(y=rep.ICC.fit), linewidth=1.2)
 
 plot
 
 #### save model paramaters
-df <- data.frame(modelf=rep(NA,6), 
-                 ICC.a = rep(NA,6), ICC.k = rep(NA,6), max.ICC = rep(NA,6), 
-                 SE.ICC.a = rep(NA,6), SE.ICC.k = rep(NA,6), SE.max.ICC = rep(NA,6),
-                 RSE= rep(NA,6), DF = rep(NA,6))
-df[1,] <- c("f1",coef(modelf1),unname(summary(modelf1)$parameters[,2]), summary(modelf1)$sigma, summary(modelf1)$df[2])
-df[2,] <- c("f2",coef(modelf2),unname(summary(modelf2)$parameters[,2]), summary(modelf2)$sigma, summary(modelf2)$df[2])
-df[3,] <- c("f3",coef(modelf3),unname(summary(modelf3)$parameters[,2]), summary(modelf3)$sigma, summary(modelf3)$df[2])
-df[4,] <- c("f4",coef(modelf4),unname(summary(modelf4)$parameters[,2]), summary(modelf4)$sigma, summary(modelf4)$df[2])
-df[5,] <- c("f5",coef(modelf5),unname(summary(modelf5)$parameters[,2]), summary(modelf5)$sigma, summary(modelf5)$df[2])
-df[6,] <- c("f6",coef(modelf6),unname(summary(modelf6)$parameters[,2]), summary(modelf6)$sigma, summary(modelf6)$df[2])
+df <- data.frame(modelf=rep(NA,2),
+                 method=rep(NA,2),
+                 sample.type=rep(NA,2),
+                 ICC.a = rep(NA,2), ICC.k = rep(NA,2), max.ICC = rep(NA,2), 
+                 SE.ICC.a = rep(NA,2), SE.ICC.k = rep(NA,2), SE.max.ICC = rep(NA,2),
+                 RSE= rep(NA,2), DF = rep(NA,2))
+df[1,] <- c("f1","ElNet.clocks","cervical.smear",coef(modelf1),unname(summary(modelf1)$parameters[,2]), summary(modelf1)$sigma, summary(modelf1)$df[2])
+df[2,] <- c("f2","PC.ElNet.clocks","cervical.smear",coef(modelf2),unname(summary(modelf2)$parameters[,2]), summary(modelf2)$sigma, summary(modelf2)$df[2])
 
-parTable <- df %>%
-  mutate(method = case_when(
-    modelf=="f1" ~ "ElNet", modelf=="f2" ~ "ElNet.unreliable.removed",
-    modelf=="f3" ~ "PC.ElNet", modelf=="f4" ~ "PC.ElNet.unreliable.removed",
-    modelf=="f5" ~ "Lasso", modelf=="f6" ~ "Lasso.unreliable.removed"
-  )) %>%
-  select(method,ICC.a,SE.ICC.a,ICC.k,SE.ICC.k,max.ICC,SE.max.ICC,RSE,DF)
-parTable$ICC.a <- round(as.numeric(parTable$ICC.a), digits=1)
-parTable$SE.ICC.a <- round(as.numeric(parTable$SE.ICC.a), digits=1)
-parTable$ICC.k <- round(as.numeric(parTable$ICC.k), digits=1)
-parTable$SE.ICC.k <- round(as.numeric(parTable$SE.ICC.k), digits=1)
-parTable$max.ICC <- round(as.numeric(parTable$max.ICC), digits=1)
-parTable$SE.max.ICC <- round(as.numeric(parTable$SE.ICC.k), digits=1)
-parTable$RSE <- round(as.numeric(parTable$RSE), digits=3)
+df <- df %>% select(method,sample.type,ICC.a,SE.ICC.a,ICC.k,SE.ICC.k,max.ICC,SE.max.ICC,RSE,DF)
+df$ICC.a <- round(as.numeric(df$ICC.a), digits=1)
+df$SE.ICC.a <- round(as.numeric(df$SE.ICC.a), digits=1)
+df$ICC.k <- round(as.numeric(df$ICC.k), digits=1)
+df$SE.ICC.k <- round(as.numeric(df$SE.ICC.k), digits=1)
+df$max.ICC <- round(as.numeric(df$max.ICC), digits=3)
+df$SE.max.ICC <- round(as.numeric(df$SE.ICC.k), digits=3)
+df$RSE <- round(as.numeric(df$RSE), digits=3)
 
-saveRDS(parTable, file = "./4-output/precision_ICC_modelpar.Rds")
+saveRDS(df, file = "./4-output/precision_ICC_modelpar.Rds")
 
 ```
 
 ```{r}
-parTable %>% kbl() %>% kable_styling()
+df %>% kbl() %>% kable_styling()
 ```
 
 <br><br>
@@ -637,10 +316,9 @@ parTable %>% kbl() %>% kable_styling()
 ```{r, message=FALSE, echo=FALSE, fig.width=12, fig.height=4}
 
 plot <- results_exp %>%
-  ggplot(aes(x=train.sample.size,y=n.features,color=input.CpGs)) +
+  ggplot(aes(x=train.sample.size,y=n.features,color=method)) +
   geom_point() +
-  #geom_smooth(method="lm", se=FALSE) +
-  facet_wrap(~method)
+  geom_smooth(method="lm", se=FALSE)
 
 plot
 
