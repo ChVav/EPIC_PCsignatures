@@ -14,20 +14,25 @@ header-includes:
 
 ```{r, echo=FALSE, message = FALSE, warning = FALSE}
 library(knitr)
-library(ggplot2)
-library(patchwork)
-library(dplyr)
 library(tidyverse)
+library(patchwork)
 library(kableExtra)
+library(rcartocolor)
+
+palette = carto_pal(8,"Safe")
 
 knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning = FALSE)
 
 theme_set(theme_minimal())
 
+# source helper functions
+source("../1-src/functions/calcRepea.R") # helper function for estimating precision/repeatability
+source("../1-src/functions/regresAge.R") # helper function for calculating root mean squared error
+
 ```
 
 
-```{r, echo=FALSE,message=FALSE, warning=FALSE, fig.width=10, fig.height=5}
+```{r, echo=FALSE,message=FALSE, warning=FALSE, fig.width=8, fig.height=8}
 
 comparison <- readRDS("../1-src/analysis/1-Hannum-clocks-Higgins/2-output/pheno_BloodRep_450K_Hannum_PC.Rds")
 
@@ -36,7 +41,7 @@ fit <- lm(round(Hannum.EUTOPS, digits=4) ~ round(Hannum.higgins, digits=4), data
 anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
                  "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
 
-a <- comparison %>%
+plota <- comparison %>%
   ggplot(aes(x = round(Hannum.higgins, digits=4), y = round(Hannum.EUTOPS, digits=4))) +
   geom_point() +
   theme(panel.background = element_blank(),aspect.ratio = 1) +
@@ -63,11 +68,11 @@ fit <- lm(round(Hannum_PCproxy.EUTOPS, digits=4) ~ round(Hannum_PCproxy.higgins,
 anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
                  "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
 
-b <- comparison %>%
+plotb <- comparison %>%
   ggplot(aes(x = round(Hannum_PCproxy.higgins, digits=4), y = round(Hannum_PCproxy.EUTOPS, digits=4))) +
   geom_point() +
   theme(panel.background = element_blank(),aspect.ratio = 1) +
-  geom_smooth(method = "lm",
+  geom_smooth(method = "lm, Hannum PC_prox",
                 formula = y ~ x,
                 size = 0.5,
                 se = FALSE,
@@ -84,10 +89,120 @@ b <- comparison %>%
             hjust = 0,
             linewidth = 3)
 
-plot <- a+b
+### c) performance Hannum original and Hannum_PCy in 450K blood data ##----
+result_BloodRep <- readRDS("../1-src/analysis/1-Hannum-clocks-Higgins/2-output/pheno_BloodRep_450K_Hannum_PC.Rds")
+
+# create data frame for plotting
+df <- as.data.frame(matrix(data=NA, nrow=2,ncol=2))
+colnames(df) <- c("clock","RMSE")
+clocks <- c("Hannum.EUTOPS","Hannum_PC.EUTOPS")
+
+# accuracy for each clock, regress and save RMSE
+for(i in 1:length(clocks)){
+  df[i,1] <- clocks[i]
+  df[i,2] <- sqrt(mean(regresAge(result_BloodRep,clocks[i],"", mode="fitting")$residuals^2)) 
+}
+
+# precision for each clock, calculate ICC
+result_BloodRep$sample_ID <- result_BloodRep$sample
+result_BloodRep$sample_type <- "Blood"
+precision <- calcRepea(result_BloodRep,clocks)
+precision <- precision[[2]] %>% dplyr::rename(clock=index) %>% select(-sample_type)
+
+df <- full_join(df, precision)
+
+#plot
+cols <- c(palette[1],palette[5])
+df$clock <- factor(df$clock, levels = clocks)
+labels <- c("Hannum", "Hannum_PC")
+
+plotc <- df %>%
+  ggplot(aes(x=RMSE,y=ICC,color=clock, shape=clock)) +
+  geom_point(size=4) +
+  labs(color  = "", shape = "") +
+  geom_errorbar(mapping=aes(ymin=CI0.95_lower, ymax=CI0.95_higher), width=0.2, size=0.2) + 
+  xlim(3,4.5) +
+  ylim(0.95,1) +
+  scale_color_manual(labels=labels, values=cols)+
+  scale_shape_manual(labels=labels, values=c(15,16))+
+  theme_minimal()
+
+# Original Hannum vs chronological age
+fit <- lm(round(Hannum.EUTOPS, digits=4) ~ round(age, digits=4), data = result_BloodRep)
+anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
+               "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+
+#CI for slope
+#fit <- lm(Hannum.EUTOPS ~ age, data = result_BloodRep)
+#confint(fit,'age',level=0.95)
+
+plotd <- result_BloodRep %>%
+  ggplot(aes(x = round(age, digits=4), y = round(Hannum.EUTOPS, digits=4))) +
+  geom_point(color=cols[1], shape=15) +
+  theme(panel.background = element_blank()) +
+  geom_smooth(method = "lm",
+              formula = y ~ x,
+              size = 0.5,
+              se = FALSE,
+              alpha = 0.3,
+              colour = "gray40") +
+  xlab("Age") +
+  ylab("Hannum predicted age")  +
+  xlim(35,85) +
+  ylim(35,85) +
+  annotate("text",
+           x=50,
+           y = 40,
+           label = anno,
+           hjust = 0,
+           size = 3) 
+
+# PC Age vs chronological age
+fit <- lm(round(Hannum_PC.EUTOPS, digits=4) ~ round(age, digits=4), data = result_BloodRep)
+anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
+               "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+
+#CI for slope
+#fit <- lm(Hannum_PC.EUTOPS ~ age, data = result_BloodRep)
+#confint(fit,'age',level=0.95)
+#fit <- lm(Hannum_PCproxy.EUTOPS ~ age, data = result_BloodRep)
+#confint(fit,'age',level=0.95)
+
+plote <- result_BloodRep %>%
+  ggplot(aes(x = round(age, digits=4), y = round(Hannum_PC.EUTOPS, digits=4))) +
+  geom_point(color=cols[2], shape=16) +
+  theme(panel.background = element_blank(),plot.margin = margin(0, 0, 0, 0, "pt")) +
+  geom_smooth(method = "lm",
+              formula = y ~ x,
+              size = 0.5,
+              se = FALSE,
+              alpha = 0.3,
+              colour = "gray40") +
+  xlab("Age") +
+  ylab("Hannum_PC predicted age")  +
+  xlim(35,85) +
+  ylim(35,85) +
+  annotate("text",
+           x=50,
+           y = 40,
+           label = anno,
+           hjust = 0,
+           size = 3) 
+
+
+## combined plot ##----
+
+des <- "
+#AABB
+#AABB
+cDDEE"
+
+plot <- plota +  plotb + plotc + plotd + plote + plot_layout(design = des) + plot_annotation(tag_levels = 'a', tag_prefix = '(', tag_suffix = ')')
 
 plot
 
 ```
 
-\subsection{Extended data item 2. Reproducing clock calculations presented by [1].} Regression of age predictions for the same clock versions calculated ourselves (Y-axis) versus by [1] (X-axis). Age estimations were done for samples in the "BloodRep_450K" dataset (GEO ID GSE55763) with the *a.* Hannum original clock and *b.* by Hannum PC proxy clock. <br>
+\subsection{Extended data item 2. Reproducing clock calculations presented by [1].} Regression of age predictions for the same clock versions calculated ourselves (Y-axis) versus by [1] (X-axis) for **(a)** the original Hannum clock and **(b)** the PC version of the Hannum clock. The PC version of the Hannum clock was trained on the original subset of 78,464 CpGs by Higgins-Chen et al. [1] from the 450K "Hannum" dataset (n=656 samples; GEO ID GSE40279). Age estimations were done for 2x36 technical replicates from blood samples in the "BloodRep_450K" dataset (GEO ID GSE55763). **(c)** Summary of the performance the clock predictions in the test set "BloodRep_450K". Precision (ICC; error bars represent 95% confidence intervals) and
+accuracy (RMSE) of the linear regression between predicted age versus chronological
+age, with corresponding regressions for **(d)** the original Hannum clock and **(e)** the PC version of the Hannum clock. <br>
