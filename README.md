@@ -1,5 +1,5 @@
 
-This version of the code accompanies a pending submission to Nature Aging, Matters Arising: Vavourakis, C. D., Herzog, C. M., & Widschwendter, M. (2023). Devising reliable and accurate epigenetic clocks: choosing the optimal computational solution (submitted). <br>
+This version of the code accompanies a pending submission to BioData Mining, Brief Report: Vavourakis, C. D., Herzog, C. M., & Widschwendter, M. (2023). Devising reliable and accurate epigenetic predictors: choosing the optimal computational solution (submitted). <br>
 
 ## Scope and data availability
 
