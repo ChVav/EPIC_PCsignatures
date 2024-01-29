@@ -1,85 +1,111 @@
+
 # Copyright (c) 2023 Charlotte D. Vavourakis. Licensed under the MIT license (see LICENSE.md).
 
-library(patchwork)
 library(tidyverse)
+library(patchwork)
 library(rcartocolor)
 
 palette = carto_pal(8,"Safe")
-cols <- c(palette[1],palette[5])
 
-# source helper functions
-source("../1-src/functions/regresAge.R") # helper function for calculating root mean squared error
+## note that also Lasso penalized regression was performed, but not shown here
+## note that all models were on all CpGs, we tested also removing flagged unreliable probes (low normalized intensit, not on EPIC v2.0), not shown here
 
-### a/b) performance Hannum original and Hannum_PC, Hannum PC_proxy in 450K blood data, full population study ##----
-result_BloodFull <- readRDS("../1-src/analysis/1-Hannum-clocks-Higgins/3-output/pheno_BloodFull_450K_Hannum_PC.Rds")
+## Experiment 450K blood ##----
 
-# Original Hannum vs chronological age
-fit <- lm(round(Hannum, digits=4) ~ round(age, digits=4), data = result_BloodFull)
-anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
-               "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+accuracy <- readRDS("../1-src/analysis/3-training-size-experiment/8-output/accuracy_slope.Rds")
+precision <- readRDS("../1-src/analysis/3-training-size-experiment/8-output/precision_ICC.Rds")
 
-#CI for slope
-#fit <- lm(Hannum ~ age, data = result_BloodFull)
-#confint(fit,'age',level=0.95) #0.8121643 - 0.8431847
+#add variable so that can have different shades of colors for lines/points
+accuracy <- accuracy %>%
+  mutate(colPoints = case_when(method == "ElNet" ~ palette[7], TRUE ~ palette[2]),
+         colLines = case_when(method == "ElNet" ~ palette[4], TRUE ~ palette[6]))
 
-plota <- result_BloodFull %>%
-  ggplot(aes(x = round(age, digits=4), y = round(Hannum, digits=4))) +
-  geom_point(color=cols[1], shape=15, size=0.3) +
-  theme(panel.background = element_blank()) +
-  geom_smooth(method = "lm",
-              formula = y ~ x,
-              size = 0.5,
-              se = FALSE,
-              alpha = 0.3,
-              colour = "gray40") +
-  xlab("Age") +
-  ylab("Hannum predicted age")  +
-  xlim(35,85) +
-  ylim(35,85) +
-  annotate("text",
-           x=50,
-           y = 40,
-           label = anno,
-           hjust = 0,
-           size = 3) 
+precision <- precision %>%
+  mutate(colPoints = case_when(method == "ElNet" ~ palette[7], TRUE ~ palette[2]),
+         colLines = case_when(method == "ElNet" ~ palette[4], TRUE ~ palette[6]))
 
-# PC Age vs chronological age
-fit <- lm(round(Hannum.PC2, digits=4) ~ round(age, digits=4), data = result_BloodFull)
-anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
-               "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
+#### plot all results and modeled curves
+plota <- accuracy %>%
+  filter(method %in% c("ElNet","PC")) %>% 
+  droplevels() %>%
+  ggplot(aes(x=train.sample.size, shape = method, linetype = method)) +
+  geom_point(aes(y=val.slope.regress, color = colPoints), size=0.8) +
+  geom_line(aes(y=val.slope.regress.fit, color = colLines), size=0.8) +
+  scale_color_identity() + #guide="legend" adds a legend that is not useful, modify manually in Inscape
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  labs(color="", shape = "", linetype = "") +
+  ylab("Slope regression age vs predicted age") +
+  xlab('n training samples \n from "BloodFull_450K"') +
+  ylim(0, 1) +
+  theme_minimal() +
+  ggtitle('Accuracy in "Hannum" test set')
 
-#CI for slope
-#fit <- lm(Hannum.PC2 ~ age, data = result_BloodFull)
-#confint(fit,'age',level=0.95) # 0.5725942 - 0.5983141
+plotb <- precision %>%
+  filter(method %in% c("ElNet","PC")) %>% 
+  droplevels() %>%
+  ggplot(aes(x=train.sample.size, shape = method, linetype = method)) +
+  geom_point(aes(y=rep.ICC, color = colPoints), size=0.8) +
+  geom_line(aes(y=rep.ICC.fit, color = colLines), size=0.8) +
+  scale_color_identity() +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  labs(color="", shape = "", linetype = "") +
+  ylab("ICC") +
+  xlab('n training samples \n from "BloodFull_450K"') +
+  ylim(0, 1) +
+  theme_minimal() +
+  ggtitle('Reliability in "BloodRep_450K" test set')
 
-plotb <- result_BloodFull %>%
-  ggplot(aes(x = round(age, digits=4), y = round(Hannum.PC2, digits=4))) +
-  geom_point(color=cols[2], shape=16, size=0.3) +
-  theme(panel.background = element_blank(),plot.margin = margin(0, 0, 0, 0, "pt")) +
-  geom_smooth(method = "lm",
-              formula = y ~ x,
-              size = 0.5,
-              se = FALSE,
-              alpha = 0.3,
-              colour = "gray40") +
-  xlab("Age") +
-  ylab("Hannum_PC2 predicted age")  +
-  xlim(35,85) +
-  ylim(35,85) +
-  annotate("text",
-           x=50,
-           y = 40,
-           label = anno,
-           hjust = 0,
-           size = 3) 
+## Experiment EPIC cervical smear samples  ##----
+accuracy <- readRDS("../1-src/analysis/3-training-size-experiment/4-output/accuracy_slope.Rds")
+precision <- readRDS("../1-src/analysis/3-training-size-experiment/4-output/precision_ICC.Rds")
 
-## combined plot ##----
+#add variable so that can have different shades of colors for lines/points
+accuracy <- accuracy %>%
+  mutate(colPoints = case_when(method == "ElNet" ~ palette[7], TRUE ~ palette[2]),
+         colLines = case_when(method == "ElNet" ~ palette[4], TRUE ~ palette[6]))
+ 
+precision <- precision %>%
+  mutate(colPoints = case_when(method == "ElNet" ~ palette[7], TRUE ~ palette[2]),
+         colLines = case_when(method == "ElNet" ~ palette[4], TRUE ~ palette[6]))
 
-des <- "
-AB"
+#### plot all results and modeled curves
+plotc <- accuracy %>%
+  filter(method %in% c("ElNet","PC")) %>% 
+  droplevels() %>%
+  ggplot(aes(x=train.sample.size, shape = method, linetype = method)) +
+  geom_point(aes(y=val.slope.regress, color = colPoints), size=0.8) +
+  geom_line(aes(y=val.slope.regress.fit, color = colLines), size=0.8) +
+  scale_color_identity() + #guide="legend" adds a legend that is not useful, modify manually in Inscape
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  labs(color="", shape = "", linetype = "") +
+  ylab("Slope regression age vs predicted age") +
+  xlab('n training samples \n from "3CDisc"') +
+  ylim(0, 1) +
+  theme_minimal() +
+  ggtitle('Accuracy in "3CExtVal" test set')
 
-plot <- plota +  plotb + plot_layout(design = des) + plot_annotation(tag_levels = 'a', tag_prefix = '(', tag_suffix = ')')
+plotd <- precision %>%
+  filter(method %in% c("ElNet","PC")) %>% 
+  droplevels() %>%
+  ggplot(aes(x=train.sample.size, shape = method, linetype = method)) +
+  geom_point(aes(y=rep.ICC, color = colPoints), size=0.8) +
+  geom_line(aes(y=rep.ICC.fit, color = colLines), size=0.8) +
+  scale_color_identity() +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  labs(color="", shape = "", linetype = "") +
+  ylab("ICC") +
+  xlab('n training samples \n from "3CDisc"') +
+  ylim(0, 1) +
+  theme_minimal() +
+  ggtitle('Reliability in "repeatability" test set')
 
-ggsave(filename='Figure1.pdf', plot, width=6, height=2.5, dpi = 600)
-ggsave(filename= 'Figure1.jpeg', plot, width=120, height=60, units= "mm", dpi=600)
 
+## combined plot  ##----
+
+des <- c("
+         AB
+         CD")
+
+plot <- plota + plotb + plotc + plotd + plot_layout(guides="collect", design=des) + plot_annotation(tag_levels = 'a', tag_prefix = '(', tag_suffix = ')')
+
+ggsave(filename='Figure2.pdf', plot, width=11, height=8, dpi = 600) #legend needs to be edited manually unfortunately

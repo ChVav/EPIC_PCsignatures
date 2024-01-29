@@ -77,14 +77,14 @@ def plot_roc_curve(tpr, fpr, scatter = True, ax = None):
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
 
-if not os.path.exists("./6-output"):
-        os.makedirs("./6-output")
+if not os.path.exists("./3-output"):
+        os.makedirs("./3-output")
 
 ### 3C ###----
 
 # read in results
-pheno_test = pd.read_feather('./4-3C-PC/1-output/pheno_test.feather')
-pred = pd.read_csv("./2-3C/7-output/predictions.csv")
+pheno_test = pd.read_feather('./2-3C-PC/1-output/pheno_test.feather')
+pred = pd.read_csv("./1-3C/7-output/predictions.csv")
 
 # prepare data
 classes = np.array(["Control","Breast","Endometrial","Ovarian"])
@@ -125,7 +125,7 @@ for i in range(len(classes)):
 
 plt.tight_layout()
 
-plt.savefig('./6-output/OvR-3C.png')
+plt.savefig('./3-output/OvR-3C.pdf', format='pdf')
 plt.close()
 
 # calculate average and save AUCs in dataframe
@@ -141,7 +141,7 @@ print(f"average ROC AUC OvR: {avg_roc_auc/i:.4f}")
 df = pd.DataFrame(roc_auc_ovr.items())
 df.columns = ["Class","AUC"]
 df = df.assign(Signature = "multi3C.autogluon", method = "OvR")
-df.to_csv("./6-output/multiclassAUCs1.csv")
+df.to_csv("./3-output/multiclassAUCs1.csv")
 
 ## One versus One (OvO) ##----
 classes_combinations = []
@@ -192,7 +192,7 @@ for i in range(len(classes_combinations)):
     
 plt.tight_layout()
 
-plt.savefig('./6-output/OvO-3C.png')
+plt.savefig('./3-output/OvO-3C.pdf', format='pdf')
 plt.close()
 
 # calculate average and save AUCs in dataframe
@@ -208,13 +208,13 @@ print(f"average ROC AUC OvO: {avg_roc_auc/i:.4f}")
 df = pd.DataFrame(roc_auc_ovo.items())
 df.columns = ["Class","AUC"]
 df = df.assign(Signature = "multi3C.autogluon", method = "OvO")
-df.to_csv("./6-output/multiclassAUCs2.csv")
+df.to_csv("./3-output/multiclassAUCs2.csv")
 
 ### 3C-PC ###----
 
 # read in results
-pheno_test = pd.read_feather('./4-3C-PC/1-output/pheno_test.feather')
-pred = pd.read_csv("./4-3C-PC/2-output/predictions.csv")
+pheno_test = pd.read_feather('./2-3C-PC/1-output/pheno_test.feather')
+pred = pd.read_csv("./2-3C-PC/2-output/predictions.csv")
 
 # prepare data
 classes = np.array(["Control","Breast","Endometrial","Ovarian"])
@@ -255,7 +255,7 @@ for i in range(len(classes)):
 
 plt.tight_layout()
 
-plt.savefig('./6-output/OvR-3C-PC.png')
+plt.savefig('./3-output/OvR-3C-PC.pdf', format='pdf')
 plt.close()
 
 # calculate average and save AUCs in dataframe
@@ -271,7 +271,7 @@ print(f"average ROC AUC OvR: {avg_roc_auc/i:.4f}")
 df = pd.DataFrame(roc_auc_ovr.items())
 df.columns = ["Class","AUC"]
 df = df.assign(Signature = "multi3C.autogluon_PC", method = "OvR")
-df.to_csv("./6-output/multiclassAUCs3.csv")
+df.to_csv("./3-output/multiclassAUCs3.csv")
 
 ## One versus One (OvO) ##----
 classes_combinations = []
@@ -322,7 +322,7 @@ for i in range(len(classes_combinations)):
     
 plt.tight_layout()
 
-plt.savefig('./6-output/OvO-3C-PC.png')
+plt.savefig('./3-output/OvO-3C-PC.pdf', format='pdf')
 plt.close()
 
 # calculate average and save AUCs in dataframe
@@ -338,5 +338,5 @@ print(f"average ROC AUC OvO: {avg_roc_auc/i:.4f}")
 df = pd.DataFrame(roc_auc_ovo.items())
 df.columns = ["Class","AUC"]
 df = df.assign(Signature = "multi3C.autogluon_PC", method = "OvO")
-df.to_csv("./6-output/multiclassAUCs4.csv")
+df.to_csv("./3-output/multiclassAUCs4.csv")
 

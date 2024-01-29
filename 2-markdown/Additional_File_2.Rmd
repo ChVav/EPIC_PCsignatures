@@ -32,64 +32,9 @@ source("../1-src/functions/regresAge.R") # helper function for calculating root 
 ```
 
 
-```{r, echo=FALSE,message=FALSE, warning=FALSE, fig.width=8, fig.height=8}
+```{r, echo=FALSE,message=FALSE, warning=FALSE, fig.width=8, fig.height=4}
 
-comparison <- readRDS("../1-src/analysis/1-Hannum-clocks-Higgins/2-output/pheno_BloodRep_450K_Hannum_PC.Rds")
-
-# a) original Hannum clock
-fit <- lm(round(Hannum.EUTOPS, digits=4) ~ round(Hannum.higgins, digits=4), data = comparison)
-anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
-                 "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
-
-plota <- comparison %>%
-  ggplot(aes(x = round(Hannum.higgins, digits=4), y = round(Hannum.EUTOPS, digits=4))) +
-  geom_point() +
-  theme(panel.background = element_blank(),aspect.ratio = 1) +
-  geom_smooth(method = "lm",
-                formula = y ~ x,
-                size = 0.5,
-                se = FALSE,
-                alpha = 0.3,
-                colour = "gray40") +
-  xlab("Hannum age (higgins)") +
-  ylab("Hannum age (EUTOPS)")  +
-  xlim(35,85) +
-  ylim(35,85) +
-  annotate("text",
-            x=40,
-            y = 80,
-            label = anno,
-            hjust = 0,
-            linewidth = 3)
-
-# b) Hannum PC proxy
-
-fit <- lm(round(Hannum_PCproxy.EUTOPS, digits=4) ~ round(Hannum_PCproxy.higgins, digits=4), data = comparison)
-anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
-                 "\ny = ", round(fit$coefficients[2],2) , "x + ", round(fit$coefficients[1],2))
-
-plotb <- comparison %>%
-  ggplot(aes(x = round(Hannum_PCproxy.higgins, digits=4), y = round(Hannum_PCproxy.EUTOPS, digits=4))) +
-  geom_point() +
-  theme(panel.background = element_blank(),aspect.ratio = 1) +
-  geom_smooth(method = "lm, Hannum PC_prox",
-                formula = y ~ x,
-                size = 0.5,
-                se = FALSE,
-                alpha = 0.3,
-                colour = "gray40") +
-  xlab("Hannum_PCproxy age (higgins)") +
-  ylab("Hannum_PCproxy age (EUTOPS)")  +
-  xlim(35,85) +
-  ylim(35,85) +
-  annotate("text",
-            x=40,
-            y = 80,
-            label = anno,
-            hjust = 0,
-            linewidth = 3)
-
-### c) performance Hannum original and Hannum_PCy in 450K blood data ##----
+### a) performance Hannum original and Hannum_PCy in 450K blood data ##----
 result_BloodRep <- readRDS("../1-src/analysis/1-Hannum-clocks-Higgins/2-output/pheno_BloodRep_450K_Hannum_PC.Rds")
 
 # create data frame for plotting
@@ -116,7 +61,7 @@ cols <- c(palette[1],palette[5])
 df$clock <- factor(df$clock, levels = clocks)
 labels <- c("Hannum", "Hannum_PC")
 
-plotc <- df %>%
+plota <- df %>%
   ggplot(aes(x=RMSE,y=ICC,color=clock, shape=clock)) +
   geom_point(size=4) +
   labs(color  = "", shape = "") +
@@ -136,10 +81,11 @@ anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
 #fit <- lm(Hannum.EUTOPS ~ age, data = result_BloodRep)
 #confint(fit,'age',level=0.95)
 
-plotd <- result_BloodRep %>%
+plotb <- result_BloodRep %>%
   ggplot(aes(x = round(age, digits=4), y = round(Hannum.EUTOPS, digits=4))) +
   geom_point(color=cols[1], shape=15) +
-  theme(panel.background = element_blank()) +
+  theme(panel.background = element_blank(),
+        aspect.ratio=1) +
   geom_smooth(method = "lm",
               formula = y ~ x,
               size = 0.5,
@@ -168,10 +114,11 @@ anno <- paste0("R2 = ", signif(summary(fit)$r.squared, 3),
 #fit <- lm(Hannum_PCproxy.EUTOPS ~ age, data = result_BloodRep)
 #confint(fit,'age',level=0.95)
 
-plote <- result_BloodRep %>%
+plotc <- result_BloodRep %>%
   ggplot(aes(x = round(age, digits=4), y = round(Hannum_PC.EUTOPS, digits=4))) +
   geom_point(color=cols[2], shape=16) +
-  theme(panel.background = element_blank(),plot.margin = margin(0, 0, 0, 0, "pt")) +
+  theme(panel.background = element_blank(),plot.margin = margin(0, 0, 0, 0, "pt"),
+        aspect.ratio=1) +
   geom_smooth(method = "lm",
               formula = y ~ x,
               size = 0.5,
@@ -192,17 +139,12 @@ plote <- result_BloodRep %>%
 
 ## combined plot ##----
 
-des <- "
-#AABB
-#AABB
-cDDEE"
-
-plot <- plota +  plotb + plotc + plotd + plote + plot_layout(design = des) + plot_annotation(tag_levels = 'a', tag_prefix = '(', tag_suffix = ')')
+plot <- plota +  plotb + plotc + plot_annotation(tag_levels = 'a', tag_prefix = '(', tag_suffix = ')')
 
 plot
 
 ```
 
-\subsection{Extended data item 2. Reproducing clock calculations presented by [1].} Regression of age predictions for the same clock versions calculated ourselves (Y-axis) versus by [1] (X-axis) for **(a)** the original Hannum clock and **(b)** the PC proxy version of the Hannum clock. **(c)** Summary of the performance the clock predictions in the test set "BloodRep_450K". Precision (ICC; error bars represent 95% confidence intervals) and
+\subsection{Additional file 2. Performance of original and PC versions [12] of the Hannum clock in the test set "BloodRep\_450K".} **(a)** Precision (ICC; error bars represent 95% confidence intervals) and
 accuracy (RMSE) of the linear regression between predicted age versus chronological
-age, with corresponding regressions for **(d)** the original Hannum clock and **(e)** the PC version of the Hannum clock. The PC and PC proxy versions of the Hannum clock were trained to predict age and Hannum age, respectively, on the original subset of 78,464 CpGs by Higgins-Chen et al. [1] from the 450K "Hannum" dataset (n=656 samples; GEO ID GSE40279). Age estimations were done for 2x36 technical replicates from blood samples in the "BloodRep_450K" dataset (GEO ID GSE55763). <br>
+age, with corresponding regressions for **(b)** the original Hannum clock and **(c)** the PC version of the Hannum clock. The PC and PC proxy versions of the Hannum clock were trained on the 450K "Hannum" dataset (n=656 samples, 78,464 features used; GEO ID GSE40279) to predict age and Hannum age, respectively, reproducing the method proposed in [12]. Age predictions were done for 2x36 technical replicates from blood samples in the "BloodRep_450K" dataset (GEO ID GSE55763).
