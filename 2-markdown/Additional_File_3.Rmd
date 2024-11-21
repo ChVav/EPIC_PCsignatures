@@ -102,4 +102,4 @@ plot <- plota +  plotb + plot_layout(design = des) + plot_annotation(tag_levels 
 plot
 ```
 
-\subsection{Additional file 3. Accuracy of the original and a PC2 versions of the Hannum clock in the test set "BloodFull\_450K".} The PC2 Hannum clock version was trained on the 450K "Hannum" dataset (n=656 samples age range 24-75 years, 473,034 features used; GEO ID GSE40279) to predict age using the method proposed in [12]. Age predictions were done for non-replicated blood samples in the "BloodFull_450K" dataset from individuals in the age range 24-75 years (GEO ID GSE55763, n=2639 blood samples). 
+\subsection{Additional file 3. Accuracy of the original and PC2 versions of the Hannum clock in the test set "BloodFull\_450K".} The PC2 Hannum clock version was trained on the 450K "Hannum" dataset (n=656 samples age range 24-75 years, 473,034 features used; GEO ID GSE40279) to predict age using the method proposed in [12]. Age predictions were done for non-replicated blood samples in the "BloodFull_450K" dataset from individuals in the age range 24-75 years (GEO ID GSE55763, n=2639 blood samples). 

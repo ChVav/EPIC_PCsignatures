@@ -145,6 +145,6 @@ plot
 
 ```
 
-\subsection{Additional file 2. Performance of original and PC versions [12] of the Hannum clock in the test set "BloodRep\_450K".} **(a)** Precision (ICC; error bars represent 95% confidence intervals) and
+\subsection{Additional file 2. Performance of original and PC versions of the Hannum clock [12] in the test set "BloodRep\_450K".} **(a)** Precision (ICC; error bars represent 95% confidence intervals) and
 accuracy (RMSE) of the linear regression between predicted age versus chronological
 age, with corresponding regressions for **(b)** the original Hannum clock and **(c)** the PC version of the Hannum clock. The PC and PC proxy versions of the Hannum clock were trained on the 450K "Hannum" dataset (n=656 samples, 78,464 features used; GEO ID GSE40279) to predict age and Hannum age, respectively, reproducing the method proposed in [12]. Age predictions were done for 2x36 technical replicates from blood samples in the "BloodRep_450K" dataset (GEO ID GSE55763).

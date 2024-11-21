@@ -24,7 +24,7 @@ Following 450K datasets (preprocessed beta-matrices) were downloaded from GEO an
     - 656 blood samples
     - training the Hannum_PC clock (Figure 1) 
     - testing the accuracy of PC versus non-PC clocks as a function of training set size (Figure 2)
-* GSE55763 (beta_BloodRep_450K.Rds): 
+* GSE55763 (beta_BloodFull_450K.Rds): 
     - 2639 blood samples
     - testing the accuracy of the original and PC version of the Hannum clock on blood samples (Figure 1)
     - training clocks as a function of training set size (Figure 2)
