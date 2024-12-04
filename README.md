@@ -1,7 +1,7 @@
 
 This version of the code accompanies a manuscript submitted to bioRxiv: <br>
 Contradictory Results: Vavourakis, C. D., Herzog, C. M., & Widschwendter, M. (2024). <br>
-Devising reliable and accurate epigenetic predictors: choosing the optimal computational solution (submitted). <br>
+Devising reliable and accurate epigenetic predictors: choosing the optimal computational solution. <br>
 https://doi.org/10.1101/2023.10.13.562187
 
 ## Scope
